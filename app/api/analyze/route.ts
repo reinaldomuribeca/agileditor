@@ -111,9 +111,27 @@ export async function POST(request: NextRequest) {
     const lastIdx = subsForPrompt.length - 1;
     const legendar = job.legendar !== false; // default true
     const animator = job.animator !== false; // default true
-    const userContext = job.prompt ? `\nCONTEXTO DO USUÁRIO: ${job.prompt}` : '';
+    const userContext = job.prompt ? `\nOBSERVAÇÕES DO USUÁRIO: ${job.prompt}` : '';
 
-    console.log(`[analyze] calling Claude for ${jobId} (${effectiveSubs.length} subtitles, ${job.subtitlesCut ? 'cut' : 'raw'} timeline)...`);
+    // Render the questionnaire (if present) as a structured block in the prompt so
+    // Claude tailors EVERY scene decision to the user's stated intent.
+    const q = job.questionnaire;
+    const questionnaireBlock = q
+      ? [
+          '',
+          'QUESTIONÁRIO DE EDIÇÃO PREENCHIDO PELO USUÁRIO (siga cada resposta com precisão):',
+          `- Tipo de conteúdo: ${q.contentType}${q.contentTypeOther ? ` (${q.contentTypeOther})` : ''}`,
+          `- Ritmo de edição: ${q.pace}`,
+          `- Trilha sonora: ${q.music.enabled ? `SIM — estilo ${q.music.style ?? 'energetic'}${q.music.styleOther ? ` (${q.music.styleOther})` : ''}, volume ${q.music.volume ?? 'medium'}` : 'NÃO'}`,
+          `- Legendas: ${q.subtitles}`,
+          `- Ilustrações: ${q.illustrations.enabled ? `SIM — estilo ${q.illustrations.style ?? 'minimal'}` : 'NÃO'}`,
+          `- Título inicial: ${q.introTitle.enabled ? `SIM — "${q.introTitle.title ?? ''}"${q.introTitle.subtitle ? ` / "${q.introTitle.subtitle}"` : ''}` : 'NÃO'}`,
+          `- Transições entre cenas: ${q.transition}`,
+          q.notes ? `- Observações livres: ${q.notes}` : '',
+        ].filter(Boolean).join('\n')
+      : '';
+
+    console.log(`[analyze] calling Claude for ${jobId} (${effectiveSubs.length} subtitles, ${job.subtitlesCut ? 'cut' : 'raw'} timeline, questionnaire=${q ? 'yes' : 'no'})...`);
 
     const userMessage = `Analise este vídeo com mentalidade viral (MrBeast/TikTok):
 
@@ -124,6 +142,7 @@ OPÇÕES ATIVAS:
 - Legendar dinâmico: ${legendar ? 'SIM - criar legendas palavra por palavra' : 'NÃO'}
 - Animator: ${animator ? 'SIM - adicionar animações em pontos críticos' : 'NÃO'}
 ${userContext}
+${questionnaireBlock}
 
 FORMATO DE RESPOSTA (JSON puro, sem markdown):
 {
@@ -160,6 +179,13 @@ REGRAS DE IDIOMA (pt-BR — não-negociável):
 - title, description, hook, summary, visualElements: SEMPRE em português brasileiro
 - imagePrompt: pode ser escrito em inglês (o gpt-image-1 entende melhor inglês para descrição visual) MAS deve incluir explicitamente "in Brazilian Portuguese" / "Portuguese (BR)" em qualquer parte do prompt que peça texto/letras visíveis na imagem. Nunca peça texto em inglês na imagem.
 
+USE O QUESTIONÁRIO PARA CALIBRAR AS CENAS:
+- Tipo de conteúdo orienta o "format" e o "mood" — humor=casual/comic, sério=professional, emocional=inspirational, educacional=educational, etc.
+- Ritmo: rápido = corte a cada 1-2s + pacing="fast" em todas; médio = 2-3s + "normal"; lento = 3-5s + "breathe"; auto = você decide.
+- Estilo de ilustração: ${q?.illustrations.enabled ? `incorpore a estética "${q.illustrations.style ?? 'minimal'}" no imagePrompt de cada cena (minimalista=clean/flat, cartoon=2D character/playful, arrows=hand-drawn arrows and circles annotation overlay, infographic=charts/icons/numbers, comic=halftone/comic-book panel)` : 'omita imagePrompts (illustrations.enabled=false)'}
+- Transições: use "${q?.transition ?? 'auto'}" como hint para o campo animationType (fade-soft → "none" no animationType e pacing="breathe"; zoom → "zoom_in"; slide → "shake" sutil; auto → você decide).
+- Se o usuário pediu "Legendas: none", reduza a dependência de texto e crie cenas mais visuais.
+
 REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
 - startLeg é o índice [N] de uma legenda EXISTENTE na transcrição acima.
 - Os ÚNICOS índices válidos são inteiros de 0 a ${lastIdx} (inclusive).
@@ -178,6 +204,39 @@ REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
 
     const rawText = message.content[0].type === 'text' ? message.content[0].text : '';
     const analysis: Analysis = extractJSON(rawText);
+
+    // ── Post-process scenes based on questionnaire ─────────────────────────
+    if (q) {
+      // (a) If illustrations are off, strip imagePrompt from every scene
+      if (!q.illustrations.enabled) {
+        analysis.scenes = analysis.scenes.map((s) => ({ ...s, imagePrompt: undefined }));
+      }
+
+      // (b) If a custom intro title was requested, prepend a forced cover scene
+      //     using the EXACT user text. This is non-negotiable: the user typed it.
+      if (q.introTitle.enabled && q.introTitle.title) {
+        const accent = analysis.accentColor ?? '#FFB800';
+        const palette = analysis.colorPalette ?? ['#FFB800', '#FF0033', '#1A1A1A'];
+        const introScene = {
+          id: 'scene-intro',
+          type: 'cover' as const,
+          startLeg: 0,
+          title: q.introTitle.title,
+          description: q.introTitle.subtitle ?? 'Título de abertura definido pelo usuário',
+          sentiment: 'exciting' as const,
+          colorPalette: palette,
+          visualElements: ['título centralizado', 'tipografia impactante', 'flash de luz'],
+          imagePrompt: q.illustrations.enabled
+            ? `Bold viral title card: massive uppercase typography that reads "${q.introTitle.title}" in Brazilian Portuguese${q.introTitle.subtitle ? ` with subtitle "${q.introTitle.subtitle}" below` : ''}, neon ${accent} accent, dark background, high contrast, mobile 9:16 format, TikTok style. All visible text in pt-BR.`
+            : undefined,
+          animationType: 'zoom_in',
+          pacing: 'fast',
+        };
+        // Push existing scenes' startLeg untouched — the intro will render
+        // for ~2-3s before the first transcript-aligned scene starts.
+        analysis.scenes = [introScene, ...analysis.scenes];
+      }
+    }
 
     await saveJobMetadata(jobId, {
       status: 'editing',

@@ -75,13 +75,23 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Hard-enforce pt-BR for any text rendered inside the image. Even if Claude
-    // forgets to add this instruction (or the user overrides the prompt), we
-    // append it deterministically so generated illustrations don't ship English
-    // captions/typography. Belt-and-suspenders to the prompt rules in analyze/route.ts.
+    // Apply the user's chosen illustration style (questionnaire question 5).
+    // We prepend a style modifier so every scene shares a consistent visual look,
+    // even if Claude varied the imagePrompt phrasing.
+    const STYLE_HINTS: Record<string, string> = {
+      minimal:     'Minimalist clean flat illustration, lots of whitespace, simple geometric shapes, modern editorial look. ',
+      cartoon:     '2D cartoon illustration, playful character art, bold outlines, vibrant flat colors. ',
+      arrows:      'Hand-drawn vlog/tutorial annotation style, sketchy arrows, circles, underlines, marker-pen aesthetic over a solid background. ',
+      infographic: 'Infographic style with charts, large numbers, icons, data-viz aesthetic, clean editorial layout. ',
+      comic:       'Comic-book panel illustration, halftone dots, bold ink lines, action burst/onomatopoeia, retro HQ feel. ',
+    };
+    const illuStyle = job.questionnaire?.illustrations.style;
+    const styleHint = illuStyle ? STYLE_HINTS[illuStyle] ?? '' : '';
+
+    // Hard-enforce pt-BR for any text rendered inside the image.
     const ptBRSuffix = ' All visible text, letters, captions, titles, and typography in the image MUST be written in Brazilian Portuguese (pt-BR). Do not include any English words, slogans, or watermarks. If text is shown, it must be in correct, idiomatic Portuguese as spoken in Brazil.';
     const alreadyHasPtBR = /portuguese|pt[\s\-]?br|brazil/i.test(rawPrompt);
-    const prompt = alreadyHasPtBR ? rawPrompt : rawPrompt + ptBRSuffix;
+    const prompt = styleHint + (alreadyHasPtBR ? rawPrompt : rawPrompt + ptBRSuffix);
 
     // Ensure images dir exists
     const imagesDir = path.dirname(await getJobFilePath(jobId, `images/${sceneId}.png`));

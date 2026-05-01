@@ -1,7 +1,8 @@
 'use client';
 
 import { useRef, useState } from 'react';
-import type { CutMode, CutAggressiveness } from '@/lib/types';
+import type { CutMode, CutAggressiveness, Questionnaire } from '@/lib/types';
+import QuestionnaireForm, { DEFAULT_QUESTIONNAIRE } from './Questionnaire';
 
 type State = 'idle' | 'selected' | 'uploading';
 
@@ -22,45 +23,6 @@ function formatEta(remainingBytes: number, bps: number): string {
   return `~${secs}s restantes`;
 }
 
-interface ToggleSwitchProps {
-  enabled: boolean;
-  onChange: (v: boolean) => void;
-  label: string;
-  subtitle: string;
-}
-
-function ToggleSwitch({ enabled, onChange, label, subtitle }: ToggleSwitchProps) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!enabled)}
-      className={`flex items-center gap-3 w-full text-left px-4 py-3 rounded-xl border transition-all duration-200 ${
-        enabled
-          ? 'border-gold/40 bg-gold/[0.06]'
-          : 'border-border-dim bg-surface-1 hover:border-border-mid'
-      }`}
-    >
-      <div
-        className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors duration-200 ${
-          enabled ? 'bg-gradient-to-r from-gold to-[#FFC933]' : 'bg-surface-2'
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
-            enabled ? 'translate-x-5' : 'translate-x-0'
-          }`}
-        />
-      </div>
-      <div className="flex-1 min-w-0">
-        <p className={`text-sm font-semibold leading-none transition-colors ${enabled ? 'text-gold' : 'text-gray-400'}`}>
-          {label}
-        </p>
-        <p className="text-xs text-gray-600 mt-0.5 leading-snug">{subtitle}</p>
-      </div>
-    </button>
-  );
-}
-
 interface CutModeOption {
   id: CutMode;
   title: string;
@@ -72,7 +34,7 @@ const CUT_MODES: CutModeOption[] = [
   {
     id: 'none',
     title: 'Sem corte',
-    desc: 'Mantém o vídeo original sem alterações de duração',
+    desc: 'Mantém o vídeo original',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m6 10V7M5 7h14l-1 12H6L5 7zM7 7l1-3h8l1 3" />
@@ -82,7 +44,7 @@ const CUT_MODES: CutModeOption[] = [
   {
     id: 'speech',
     title: 'Por fala',
-    desc: 'Remove silêncios e pausas longas entre falas',
+    desc: 'Remove silêncios entre falas',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
@@ -92,7 +54,7 @@ const CUT_MODES: CutModeOption[] = [
   {
     id: 'scene',
     title: 'Por cena',
-    desc: 'Corta trechos parados onde nada muda visualmente',
+    desc: 'Corta trechos sem mudança visual',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
@@ -102,7 +64,7 @@ const CUT_MODES: CutModeOption[] = [
   {
     id: 'ai',
     title: 'Inteligente (IA)',
-    desc: 'Claude lê o vídeo e escolhe os melhores momentos',
+    desc: 'Claude lê e escolhe os trechos',
     icon: (
       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
@@ -112,9 +74,9 @@ const CUT_MODES: CutModeOption[] = [
 ];
 
 const AGGR_OPTIONS: { id: CutAggressiveness; label: string; desc: string }[] = [
-  { id: 'subtle',     label: 'Suave',      desc: 'cortes mínimos' },
+  { id: 'subtle',     label: 'Suave',       desc: 'cortes mínimos' },
   { id: 'balanced',   label: 'Equilibrado', desc: 'recomendado' },
-  { id: 'aggressive', label: 'Agressivo',  desc: 'corta tudo' },
+  { id: 'aggressive', label: 'Agressivo',   desc: 'corta tudo' },
 ];
 
 interface CutModePickerProps {
@@ -202,15 +164,13 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
   const [state, setState] = useState<State>('idle');
   const [isDragActive, setIsDragActive] = useState(false);
-  const [prompt, setPrompt] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [loaded, setLoaded] = useState(0);
   const [speed, setSpeed] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [legendar, setLegendas] = useState(true);
-  const [animator, setAnimator] = useState(true);
   const [cutMode, setCutMode] = useState<CutMode>('speech');
   const [cutAggressiveness, setCutAggressiveness] = useState<CutAggressiveness>('balanced');
+  const [questionnaire, setQuestionnaire] = useState<Questionnaire>(DEFAULT_QUESTIONNAIRE);
 
   const pct = file ? Math.min(100, Math.round((loaded / file.size) * 100)) : 0;
 
@@ -232,7 +192,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
     setLoaded(0);
     setSpeed(0);
     setError(null);
-    setPrompt('');
     if (inputRef.current) inputRef.current.value = '';
   };
 
@@ -262,11 +221,13 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
     const formData = new FormData();
     formData.append('file', file);
-    formData.append('prompt', prompt);
-    formData.append('legendar', String(legendar));
-    formData.append('animator', String(animator));
     formData.append('cutMode', cutMode);
     formData.append('cutAggressiveness', cutAggressiveness);
+    formData.append('questionnaire', JSON.stringify(questionnaire));
+    // Backwards compat: still send notes as `prompt`, and derive legendar/animator
+    formData.append('prompt', questionnaire.notes ?? '');
+    formData.append('legendar', String(questionnaire.subtitles !== 'none'));
+    formData.append('animator', String(questionnaire.illustrations.enabled));
 
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -436,26 +397,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
       {state !== 'uploading' && (
         <>
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Opções de edição
-            </label>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <ToggleSwitch
-                enabled={legendar}
-                onChange={setLegendas}
-                label="Legendar"
-                subtitle="Legendas dinâmicas sincronizadas"
-              />
-              <ToggleSwitch
-                enabled={animator}
-                onChange={setAnimator}
-                label="Animator"
-                subtitle="Animações em pontos críticos"
-              />
-            </div>
-          </div>
-
           <CutModePicker
             mode={cutMode}
             onModeChange={setCutMode}
@@ -463,25 +404,7 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
             onAggrChange={setCutAggressiveness}
           />
 
-          <div className="space-y-2">
-            <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
-              Contexto{' '}
-              <span className="text-gray-700 normal-case font-normal tracking-normal">(opcional)</span>
-            </label>
-            <div className="relative">
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value.slice(0, 1500))}
-                placeholder="Ex: Tutorial de culinária, palestra sobre tecnologia..."
-                rows={4}
-                maxLength={1500}
-                className="w-full rounded-xl bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none focus:ring-1 focus:ring-gold/20 text-white placeholder-gray-700 text-sm px-4 py-3 resize-none transition-all duration-200"
-              />
-              <span className={`absolute bottom-2.5 right-3 text-xs tabular-nums transition-colors ${prompt.length >= 1350 ? 'text-amber-400' : 'text-gray-700'}`}>
-                {prompt.length}/1500
-              </span>
-            </div>
-          </div>
+          <QuestionnaireForm value={questionnaire} onChange={setQuestionnaire} />
 
           <button
             type="submit"

@@ -4,10 +4,74 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureJobDir, saveJobMetadata } from '@/lib/storage';
 import { rateLimit, clientIp } from '@/lib/ratelimit';
-import type { CutMode, CutAggressiveness } from '@/lib/types';
+import type {
+  CutMode,
+  CutAggressiveness,
+  Questionnaire,
+  ContentType,
+  EditingPace,
+  MusicStyle,
+  MusicVolume,
+  SubtitleStyle,
+  IllustrationStyle,
+  TransitionStyle,
+} from '@/lib/types';
 
 const ALLOWED_MODES = new Set<CutMode>(['none', 'speech', 'scene', 'ai']);
 const ALLOWED_AGGR = new Set<CutAggressiveness>(['subtle', 'balanced', 'aggressive']);
+
+const ALLOWED_CONTENT: ContentType[] = ['humor', 'serious', 'emotional', 'educational', 'documentary', 'vlog', 'commercial', 'other'];
+const ALLOWED_PACE: EditingPace[] = ['fast', 'medium', 'slow', 'auto'];
+const ALLOWED_MUSIC_STYLE: MusicStyle[] = ['energetic', 'calm', 'epic', 'comic', 'melancholic', 'electronic', 'other'];
+const ALLOWED_MUSIC_VOLUME: MusicVolume[] = ['low', 'medium', 'high'];
+const ALLOWED_SUBTITLES: SubtitleStyle[] = ['standard', 'animated', 'none'];
+const ALLOWED_ILLU_STYLE: IllustrationStyle[] = ['minimal', 'cartoon', 'arrows', 'infographic', 'comic'];
+const ALLOWED_TRANSITION: TransitionStyle[] = ['none', 'fade-soft', 'fade-fast', 'zoom', 'slide', 'auto'];
+
+function pickEnum<T extends string>(value: unknown, allowed: T[], fallback: T): T {
+  return typeof value === 'string' && (allowed as string[]).includes(value) ? (value as T) : fallback;
+}
+
+function clampStr(s: unknown, max: number): string | undefined {
+  if (typeof s !== 'string') return undefined;
+  const trimmed = s.trim();
+  if (!trimmed) return undefined;
+  return trimmed.slice(0, max);
+}
+
+function parseQuestionnaire(raw: string | null): Questionnaire {
+  let q: Record<string, unknown> = {};
+  if (raw) {
+    try { q = JSON.parse(raw) as Record<string, unknown>; } catch { /* fall through */ }
+  }
+  const m = (q.music as Record<string, unknown> | undefined) ?? {};
+  const il = (q.illustrations as Record<string, unknown> | undefined) ?? {};
+  const it = (q.introTitle as Record<string, unknown> | undefined) ?? {};
+
+  return {
+    contentType: pickEnum(q.contentType, ALLOWED_CONTENT, 'other'),
+    contentTypeOther: clampStr(q.contentTypeOther, 60),
+    pace: pickEnum(q.pace, ALLOWED_PACE, 'auto'),
+    music: {
+      enabled: m.enabled === true,
+      style: m.enabled === true ? pickEnum(m.style, ALLOWED_MUSIC_STYLE, 'energetic') : undefined,
+      styleOther: m.enabled === true ? clampStr(m.styleOther, 60) : undefined,
+      volume: m.enabled === true ? pickEnum(m.volume, ALLOWED_MUSIC_VOLUME, 'medium') : undefined,
+    },
+    subtitles: pickEnum(q.subtitles, ALLOWED_SUBTITLES, 'standard'),
+    illustrations: {
+      enabled: il.enabled !== false,
+      style: il.enabled !== false ? pickEnum(il.style, ALLOWED_ILLU_STYLE, 'minimal') : undefined,
+    },
+    introTitle: {
+      enabled: it.enabled === true,
+      title: it.enabled === true ? clampStr(it.title, 80) : undefined,
+      subtitle: it.enabled === true ? clampStr(it.subtitle, 120) : undefined,
+    },
+    transition: pickEnum(q.transition, ALLOWED_TRANSITION, 'auto'),
+    notes: clampStr(q.notes, 1500),
+  };
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,6 +114,8 @@ export async function POST(request: NextRequest) {
     const cutMode: CutMode = ALLOWED_MODES.has(rawCutMode as CutMode) ? (rawCutMode as CutMode) : 'speech';
     const cutAggressiveness: CutAggressiveness = ALLOWED_AGGR.has(rawAggr as CutAggressiveness) ? (rawAggr as CutAggressiveness) : 'balanced';
 
+    const questionnaire = parseQuestionnaire(formData.get('questionnaire') as string | null);
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
@@ -75,15 +141,22 @@ export async function POST(request: NextRequest) {
       console.log(`Video saved: ${videoPath}`);
 
       // Save job metadata
+      const warnings: string[] = [];
+      if (questionnaire.music.enabled) {
+        warnings.push('Trilha sonora solicitada — recurso ainda em desenvolvimento, será aplicado em release futura');
+      }
+
       const metadata = {
         id: jobId,
         status: 'normalizing' as const,
-        prompt: prompt || undefined,
+        prompt: prompt || questionnaire.notes || undefined,
         videoPath,
         legendar,
         animator,
         cutMode,
         cutAggressiveness,
+        questionnaire,
+        warnings: warnings.length > 0 ? warnings : undefined,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
