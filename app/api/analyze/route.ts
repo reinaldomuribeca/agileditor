@@ -60,6 +60,22 @@ PRINCÍPIOS NÃO-NEGOCIÁVEIS:
 3. O gancho (primeiros 3s) é a cena mais importante
 4. Remover todo momento morto e silêncio desnecessário
 
+REGRAS DE ILUSTRAÇÃO (não-negociáveis — toda cena é OVERLAY):
+- O vídeo do criador roda full-canvas atrás de TODA cena. Nenhum tipo de cena substitui o frame ou pausa o vídeo.
+- Cada cena é uma sobreposição animada (chip, badge, PIP corner, card pequeno) que aparece e desaparece com fade.
+- Tamanho máximo do overlay: 30% da tela. Posicionar em cantos/bordas, NUNCA cobrir o centro/rosto/boca.
+- Tipos de cena (todos overlay-only no Remotion):
+  * cover         — chip de título no topo + imagem badge corner (≤9% canvas). Usar SOMENTE para abertura.
+  * talking_head  — badge de título topo + imagem 240px corner. Default para falas longas com criador no vídeo.
+  * text_only     — card flutuante na borda esquerda (≤14% canvas). Quando o texto é o destaque mas há vídeo atrás.
+  * callout       — card 600×~430 bottom-left (≤13% canvas) com título+descrição. Para destacar dado/conceito.
+  * split         — Picture-in-Picture top-right corner (~9% canvas). Para mostrar uma referência visual ao lado da fala.
+- Duração ideal POR TIPO (em segundos, depois convertidas em frames pelo backend):
+  * Informativa (cover/text_only/callout/split): 2-4s
+  * Reação cômica/destaque rápido (callout impacto): 0.5-1.5s
+  * Identificação (nome/lugar): pelo contexto da fala (até 4s)
+- Use talking_head + callout como tipos PRINCIPAIS. Reserve cover para o gancho inicial.
+
 PROTOCOLO DE ANÁLISE — execute mentalmente ANTES de gerar o JSON:
 
 PASSO 1 — Mapeamento de cenas. Divida o vídeo (você está trabalhando com a transcrição com timestamps como proxy do conteúdo visual) com base em:

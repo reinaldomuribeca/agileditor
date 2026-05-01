@@ -55,6 +55,13 @@ PRINCÍPIOS NÃO-NEGOCIÁVEIS:
 3. O gancho (primeiros 3s) é a cena mais importante
 4. Remover todo momento morto e silêncio desnecessário
 
+REGRAS DE ILUSTRAÇÃO (não-negociáveis — toda cena é OVERLAY sobre o vídeo do criador):
+- Nenhuma cena substitui o frame nem pausa o vídeo. Tudo é overlay animado com fade.
+- Tamanho máximo: 30% da tela. Posicionar em cantos/bordas. Nunca cobrir centro/rosto.
+- Tipos: cover (chip topo + badge corner), talking_head (badge topo + img corner), text_only (card lateral esquerda), callout (card bottom-left), split (PIP top-right).
+- Duração: informativa 2-4s, reação 0.5-1.5s, identificação até 4s.
+- talking_head + callout são os principais; cover só para abertura.
+
 PROTOCOLO DE ANÁLISE — execute mentalmente ANTES de gerar o JSON:
 
 PASSO 1 — Mapeamento de cenas. Divida o vídeo com base em mudanças de plano/ângulo, cortes de continuidade, pausas > 1.5s de silêncio, e transições naturais de conteúdo. Para cada cena candidata, registre: início/fim (índices de legenda), descrição do conteúdo, presença de fala/música/silêncio, tom emocional (alegre/neutro/tenso/emocional), relevância (alta/média/baixa).
