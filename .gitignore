@@ -1,0 +1,45 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Next.js
+.next/
+out/
+dist/
+
+# Remotion
+src/__remotion__/
+
+# Env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Job artifacts (videos, transcripts, generated images, metadata)
+/data/
+public/uploads/*
+!public/uploads/.gitkeep
+tsconfig.tsbuildinfo
+
+# Claude Code
+.claude/settings.local.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Build
+.turbo/

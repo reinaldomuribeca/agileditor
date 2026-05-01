@@ -1,0 +1,46 @@
+{
+  "id": "550e8400-e29b-41d4-a716-446655440000",
+  "status": "done",
+  "videoPath": "/tmp/agil-editor-jobs/550e8400-e29b-41d4-a716-446655440000/raw.mp4",
+  "normalizedPath": "/tmp/agil-editor-jobs/550e8400-e29b-41d4-a716-446655440000/normalized.mp4",
+  "duration": 120,
+  "subtitles": [
+    {
+      "index": 0,
+      "text": "Hello everyone today we're making pasta",
+      "start": 0,
+      "end": 3,
+      "words": [
+        { "word": "Hello", "start": 0, "end": 0.5, "sentiment": "positive" },
+        { "word": "everyone", "start": 0.5, "end": 1, "sentiment": "positive" },
+        { "word": "today", "start": 1, "end": 1.5, "sentiment": "neutral" },
+        { "word": "we're", "start": 1.5, "end": 2, "sentiment": "neutral" },
+        { "word": "making", "start": 2, "end": 2.5, "sentiment": "positive" },
+        { "word": "pasta", "start": 2.5, "end": 3, "sentiment": "exciting" }
+      ]
+    }
+  ],
+  "analysis": {
+    "format": "tutorial",
+    "colorPalette": ["#1a1a2e", "#FFB800", "#00D4FF"],
+    "scenes": [
+      {
+        "id": "scene-001",
+        "type": "cover",
+        "startLeg": 0,
+        "title": "Making Perfect Pasta",
+        "description": "A step-by-step guide",
+        "colorPalette": ["#1a1a2e", "#FFB800", "#00D4FF"],
+        "sentiment": "exciting",
+        "visualElements": ["pasta", "cooking", "italian"],
+        "imagePrompt": "Italian pasta cooking scene"
+      }
+    ],
+    "accentColor": "#FFB800",
+    "mood": "educational-fun",
+    "summary": "An engaging tutorial on how to make pasta from scratch"
+  },
+  "outputPath": "/tmp/agil-editor-jobs/550e8400-e29b-41d4-a716-446655440000/output.mp4",
+  "createdAt": "2025-04-29T10:00:00Z",
+  "updatedAt": "2025-04-29T10:05:00Z"
+}
