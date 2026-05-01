@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import type { CutMode, CutAggressiveness } from '@/lib/types';
 
 type State = 'idle' | 'selected' | 'uploading';
 
@@ -39,13 +40,11 @@ function ToggleSwitch({ enabled, onChange, label, subtitle }: ToggleSwitchProps)
           : 'border-border-dim bg-surface-1 hover:border-border-mid'
       }`}
     >
-      {/* Track */}
       <div
         className={`relative flex-shrink-0 w-10 h-5 rounded-full transition-colors duration-200 ${
           enabled ? 'bg-gradient-to-r from-gold to-[#FFC933]' : 'bg-surface-2'
         }`}
       >
-        {/* Thumb */}
         <span
           className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-white shadow-sm transition-transform duration-200 ${
             enabled ? 'translate-x-5' : 'translate-x-0'
@@ -62,6 +61,141 @@ function ToggleSwitch({ enabled, onChange, label, subtitle }: ToggleSwitchProps)
   );
 }
 
+interface CutModeOption {
+  id: CutMode;
+  title: string;
+  desc: string;
+  icon: React.ReactNode;
+}
+
+const CUT_MODES: CutModeOption[] = [
+  {
+    id: 'none',
+    title: 'Sem corte',
+    desc: 'Mantém o vídeo original sem alterações de duração',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 17V7m6 10V7M5 7h14l-1 12H6L5 7zM7 7l1-3h8l1 3" />
+      </svg>
+    ),
+  },
+  {
+    id: 'speech',
+    title: 'Por fala',
+    desc: 'Remove silêncios e pausas longas entre falas',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'scene',
+    title: 'Por cena',
+    desc: 'Corta trechos parados onde nada muda visualmente',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+      </svg>
+    ),
+  },
+  {
+    id: 'ai',
+    title: 'Inteligente (IA)',
+    desc: 'Claude lê o vídeo e escolhe os melhores momentos',
+    icon: (
+      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+      </svg>
+    ),
+  },
+];
+
+const AGGR_OPTIONS: { id: CutAggressiveness; label: string; desc: string }[] = [
+  { id: 'subtle',     label: 'Suave',      desc: 'cortes mínimos' },
+  { id: 'balanced',   label: 'Equilibrado', desc: 'recomendado' },
+  { id: 'aggressive', label: 'Agressivo',  desc: 'corta tudo' },
+];
+
+interface CutModePickerProps {
+  mode: CutMode;
+  onModeChange: (m: CutMode) => void;
+  aggr: CutAggressiveness;
+  onAggrChange: (a: CutAggressiveness) => void;
+}
+
+function CutModePicker({ mode, onModeChange, aggr, onAggrChange }: CutModePickerProps) {
+  const showAggr = mode === 'speech' || mode === 'scene';
+
+  return (
+    <div className="space-y-2">
+      <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
+        Cortes automáticos
+      </label>
+
+      <div className="grid grid-cols-2 gap-2">
+        {CUT_MODES.map((opt) => {
+          const active = opt.id === mode;
+          return (
+            <button
+              key={opt.id}
+              type="button"
+              onClick={() => onModeChange(opt.id)}
+              className={`text-left p-3 rounded-xl border transition-all duration-200 ${
+                active
+                  ? 'border-gold/50 bg-gold/[0.08] shadow-[0_0_16px_rgba(255,184,0,0.08)]'
+                  : 'border-border-dim bg-surface-1 hover:border-border-mid'
+              }`}
+            >
+              <div className="flex items-start gap-2.5">
+                <div className={`mt-0.5 flex-shrink-0 ${active ? 'text-gold' : 'text-gray-500'}`}>
+                  {opt.icon}
+                </div>
+                <div className="min-w-0">
+                  <p className={`text-sm font-semibold leading-tight ${active ? 'text-gold' : 'text-gray-300'}`}>
+                    {opt.title}
+                  </p>
+                  <p className="text-[11px] text-gray-600 mt-1 leading-snug">{opt.desc}</p>
+                </div>
+              </div>
+            </button>
+          );
+        })}
+      </div>
+
+      {showAggr && (
+        <div className="pt-1">
+          <p className="text-[11px] font-semibold text-gray-600 uppercase tracking-wider mb-2">
+            Nível
+          </p>
+          <div className="grid grid-cols-3 gap-1.5">
+            {AGGR_OPTIONS.map((opt) => {
+              const active = opt.id === aggr;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  onClick={() => onAggrChange(opt.id)}
+                  className={`px-2 py-2 rounded-lg text-center border transition-all duration-200 ${
+                    active
+                      ? 'border-gold/50 bg-gold/[0.08]'
+                      : 'border-border-dim bg-surface-1 hover:border-border-mid'
+                  }`}
+                >
+                  <p className={`text-xs font-bold leading-none ${active ? 'text-gold' : 'text-gray-400'}`}>
+                    {opt.label}
+                  </p>
+                  <p className="text-[10px] text-gray-600 mt-1 leading-none">{opt.desc}</p>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function UploadZone({ onSuccess }: UploadZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const xhrRef = useRef<XMLHttpRequest | null>(null);
@@ -75,6 +209,8 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
   const [error, setError] = useState<string | null>(null);
   const [legendar, setLegendas] = useState(true);
   const [animator, setAnimator] = useState(true);
+  const [cutMode, setCutMode] = useState<CutMode>('speech');
+  const [cutAggressiveness, setCutAggressiveness] = useState<CutAggressiveness>('balanced');
 
   const pct = file ? Math.min(100, Math.round((loaded / file.size) * 100)) : 0;
 
@@ -129,6 +265,8 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
     formData.append('prompt', prompt);
     formData.append('legendar', String(legendar));
     formData.append('animator', String(animator));
+    formData.append('cutMode', cutMode);
+    formData.append('cutAggressiveness', cutAggressiveness);
 
     const xhr = new XMLHttpRequest();
     xhrRef.current = xhr;
@@ -175,10 +313,8 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-4">
-      {/* ── Upload progress view ── */}
       {state === 'uploading' ? (
         <div className="rounded-2xl border border-gold/30 bg-gold/[0.03] p-6 space-y-5">
-          {/* File info row */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
               <svg className="w-5 h-5 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -194,7 +330,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
             </button>
           </div>
 
-          {/* Progress bar + percentage */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-400 font-medium">Taxa de upload</span>
@@ -212,14 +347,12 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
             </div>
           </div>
 
-          {/* Bytes transferred */}
           <div className="flex items-center justify-between text-[11px] text-gray-700 tabular-nums border-t border-border-dim pt-3">
             <span>{(loaded / 1_048_576).toFixed(2)} MB enviados</span>
             <span>{file ? `de ${(file.size / 1_048_576).toFixed(2)} MB` : ''}</span>
           </div>
         </div>
       ) : (
-        /* ── Drop zone / file selected ── */
         <div
           className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 ${
             isDragActive
@@ -248,7 +381,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
           />
 
           {state === 'idle' ? (
-            /* Idle */
             <div className="px-8 py-14 text-center space-y-4">
               <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center transition-all duration-300 ${isDragActive ? 'bg-gold/20 border-gold/40' : 'bg-surface-2 border-border-mid'}`}>
                 <svg className={`w-7 h-7 transition-colors duration-300 ${isDragActive ? 'text-gold' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -268,7 +400,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
               </div>
             </div>
           ) : (
-            /* File selected */
             <div className="p-5 flex items-center gap-4">
               <div className="w-12 h-12 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
                 <svg className="w-6 h-6 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -294,7 +425,6 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
         </div>
       )}
 
-      {/* Error message */}
       {error && (
         <p className="text-sm text-red-400 text-center flex items-center justify-center gap-1.5">
           <svg className="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -304,10 +434,8 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
         </p>
       )}
 
-      {/* Context textarea + toggles + submit — hidden while uploading */}
       {state !== 'uploading' && (
         <>
-          {/* Toggle switches */}
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">
               Opções de edição
@@ -327,6 +455,13 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
               />
             </div>
           </div>
+
+          <CutModePicker
+            mode={cutMode}
+            onModeChange={setCutMode}
+            aggr={cutAggressiveness}
+            onAggrChange={setCutAggressiveness}
+          />
 
           <div className="space-y-2">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider">

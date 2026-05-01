@@ -4,6 +4,7 @@ import { spawn } from 'child_process';
 import fs from 'fs/promises';
 import { Subtitle, Word } from '@/lib/types';
 import { classify } from '@/lib/sentiment';
+import { analyzeTranscription } from '@/lib/whisper-hallucinations';
 
 const OpenAI = require('openai').default;
 const ffmpegInstaller = require('@ffmpeg-installer/ffmpeg');
@@ -212,16 +213,46 @@ export async function POST(request: NextRequest) {
     const totalWords = subtitles.reduce((acc, s) => acc + s.words.length, 0);
     console.log(`[transcribe] populated ${totalWords} word-level timestamps across ${subtitles.length} subtitles`);
 
-    await fs.writeFile(subtitlesPath, JSON.stringify(subtitles, null, 2));
+    // Hallucination guard. Whisper happily produces "Legendas por TIAGO ANDERSON",
+    // "thanks for watching", music markers, etc. when fed silence/music/unintelligible
+    // audio. We detect these patterns and either drop the bad subtitles or flag.
+    const halluCheck = analyzeTranscription(subtitles, job.duration);
+    let finalSubtitles = subtitles;
+    const warnings: string[] = [...(job.warnings ?? [])];
+
+    if (halluCheck.isLikelyHallucination) {
+      console.warn(
+        `[transcribe] HALLUCINATION detected — ratio=${halluCheck.ratio.toFixed(2)} ` +
+        `speech=${halluCheck.totalSpeechSeconds.toFixed(2)}s of ${(job.duration ?? 0).toFixed(2)}s ` +
+        `samples=${halluCheck.matches.join(' | ')}`,
+      );
+
+      // Replace fake subtitles with a single placeholder spanning the whole video so
+      // the cut step can still proceed but won't trim 90%+ of the video.
+      finalSubtitles = [{
+        index: 0,
+        text: '',
+        start: 0,
+        end: job.duration ?? (subtitles[subtitles.length - 1]?.end ?? 0),
+        words: [],
+      }];
+      warnings.push(
+        `Whisper retornou apenas alucinações conhecidas (${halluCheck.matches[0] ?? '—'}). ` +
+        `Considere usar "Sem corte" ou "Corte por cena" para este vídeo.`,
+      );
+    }
+
+    await fs.writeFile(subtitlesPath, JSON.stringify(finalSubtitles, null, 2));
 
     await saveJobMetadata(jobId, {
       status: 'cutting-silence',
-      subtitles,
+      subtitles: finalSubtitles,
+      warnings,
     });
 
-    console.log(`✓ Transcribed ${jobId}: ${subtitles.length} subtitles`);
+    console.log(`✓ Transcribed ${jobId}: ${finalSubtitles.length} subtitles`);
 
-    return NextResponse.json({ success: true, subtitles });
+    return NextResponse.json({ success: true, subtitles: finalSubtitles, hallucinationDetected: halluCheck.isLikelyHallucination });
 
   } catch (error) {
     const msg = (error as Error).message ?? String(error);

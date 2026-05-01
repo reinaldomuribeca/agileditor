@@ -4,6 +4,10 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureJobDir, saveJobMetadata } from '@/lib/storage';
 import { rateLimit, clientIp } from '@/lib/ratelimit';
+import type { CutMode, CutAggressiveness } from '@/lib/types';
+
+const ALLOWED_MODES = new Set<CutMode>(['none', 'speech', 'scene', 'ai']);
+const ALLOWED_AGGR = new Set<CutAggressiveness>(['subtle', 'balanced', 'aggressive']);
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +45,11 @@ export async function POST(request: NextRequest) {
     const legendar = (formData.get('legendar') as string) !== 'false';
     const animator = (formData.get('animator') as string) !== 'false';
 
+    const rawCutMode = (formData.get('cutMode') as string) ?? 'speech';
+    const rawAggr = (formData.get('cutAggressiveness') as string) ?? 'balanced';
+    const cutMode: CutMode = ALLOWED_MODES.has(rawCutMode as CutMode) ? (rawCutMode as CutMode) : 'speech';
+    const cutAggressiveness: CutAggressiveness = ALLOWED_AGGR.has(rawAggr as CutAggressiveness) ? (rawAggr as CutAggressiveness) : 'balanced';
+
     if (!file) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
@@ -73,6 +82,8 @@ export async function POST(request: NextRequest) {
         videoPath,
         legendar,
         animator,
+        cutMode,
+        cutAggressiveness,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

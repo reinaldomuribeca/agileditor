@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJobMetadata, saveJobMetadata, getJobFilePath } from '@/lib/storage';
-import { computeKeepSegments, shiftSubtitles, totalRemovedSeconds } from '@/lib/silence';
+import { computeKeepSegments, shiftSubtitles, totalRemovedSeconds, KeepSegment } from '@/lib/silence';
+import { detectSceneChanges, buildKeepSegmentsFromSceneChanges } from '@/lib/scene-cut';
+import { aiCutKeepSegments } from '@/lib/ai-cut';
+import { CutAggressiveness, CutMode, Subtitle } from '@/lib/types';
 import { spawn } from 'child_process';
 import fs from 'fs/promises';
 
@@ -11,34 +14,35 @@ export const runtime = 'nodejs';
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
 
-const MIN_GAP_SECONDS = 0.8;
-const PADDING_SECONDS = 0.05;
-
 /**
- * Build the ffmpeg `filter_complex` string that trims and concats N keep-segments.
- * One trim+atrim per segment, then a final concat filter.
+ * Aggressiveness mapping. The "balanced" row is what the legacy single-mode
+ * cut-silence used (minGap=0.8s, padding=0.05s).
  */
+const SPEECH_TUNINGS: Record<CutAggressiveness, { minGap: number; padding: number }> = {
+  subtle:     { minGap: 1.5, padding: 0.10 },
+  balanced:   { minGap: 0.8, padding: 0.05 },
+  aggressive: { minGap: 0.4, padding: 0.02 },
+};
+
+const SCENE_TUNINGS: Record<CutAggressiveness, { threshold: number; windowBefore: number; windowAfter: number; mergeGap: number }> = {
+  subtle:     { threshold: 0.55, windowBefore: 0.6, windowAfter: 2.0, mergeGap: 1.0 },
+  balanced:   { threshold: 0.40, windowBefore: 0.5, windowAfter: 1.5, mergeGap: 0.6 },
+  aggressive: { threshold: 0.20, windowBefore: 0.3, windowAfter: 1.0, mergeGap: 0.4 },
+};
+
 function buildFilterComplex(segments: { start: number; end: number }[]): string {
   const parts: string[] = [];
   for (let i = 0; i < segments.length; i++) {
     const { start, end } = segments[i];
-    parts.push(
-      `[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`,
-    );
-    parts.push(
-      `[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`,
-    );
+    parts.push(`[0:v]trim=start=${start.toFixed(3)}:end=${end.toFixed(3)},setpts=PTS-STARTPTS[v${i}]`);
+    parts.push(`[0:a]atrim=start=${start.toFixed(3)}:end=${end.toFixed(3)},asetpts=PTS-STARTPTS[a${i}]`);
   }
   const inputs = segments.map((_, i) => `[v${i}][a${i}]`).join('');
   parts.push(`${inputs}concat=n=${segments.length}:v=1:a=1[outv][outa]`);
   return parts.join(';');
 }
 
-function runFfmpegCut(
-  inputPath: string,
-  outputPath: string,
-  segments: { start: number; end: number }[],
-): Promise<void> {
+function runFfmpegCut(inputPath: string, outputPath: string, segments: { start: number; end: number }[]): Promise<void> {
   return new Promise((resolve, reject) => {
     const filter = buildFilterComplex(segments);
     const args = [
@@ -59,7 +63,7 @@ function runFfmpegCut(
       outputPath,
     ];
 
-    console.log(`[cut-silence] spawn ffmpeg, ${segments.length} keep-segments, filter length=${filter.length}`);
+    console.log(`[cut] spawn ffmpeg, ${segments.length} keep-segments, filter length=${filter.length}`);
     const proc = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
 
     let stderrTail = '';
@@ -68,13 +72,12 @@ function runFfmpegCut(
       const text = chunk.toString();
       stderrTail = (stderrTail + text).slice(-2000);
       const m = text.match(/frame=\s*(\d+).*?time=(\S+)/);
-      if (m) console.log(`[cut-silence] frame=${m[1]} time=${m[2]}`);
+      if (m) console.log(`[cut] frame=${m[1]} time=${m[2]}`);
     });
 
     proc.on('error', reject);
     proc.on('close', (code, signal) => {
       if (code === 0) {
-        console.log('[cut-silence] ffmpeg closed cleanly');
         resolve();
       } else {
         const reason = signal ? `signal ${signal}` : `exit code ${code}`;
@@ -82,6 +85,77 @@ function runFfmpegCut(
       }
     });
   });
+}
+
+/**
+ * Compute keep-segments based on the selected cut mode. Pure dispatcher — does no I/O
+ * for `none`, calls ffmpeg for `scene`, calls Claude for `ai`, runs subtitle math for `speech`.
+ */
+async function computeKeepForMode(args: {
+  mode: CutMode;
+  aggressiveness: CutAggressiveness;
+  subtitles: Subtitle[];
+  videoPath: string;
+  totalDuration: number;
+  prompt?: string;
+}): Promise<{ segments: KeepSegment[]; modeUsed: CutMode; notes: string[] }> {
+  const { mode, aggressiveness, subtitles, videoPath, totalDuration, prompt } = args;
+  const notes: string[] = [];
+
+  if (mode === 'none') {
+    return {
+      segments: [{ start: 0, end: totalDuration, cumulativeRemoved: 0 }],
+      modeUsed: 'none',
+      notes: ['Modo "sem corte" — vídeo mantido por inteiro'],
+    };
+  }
+
+  if (mode === 'speech') {
+    const tune = SPEECH_TUNINGS[aggressiveness];
+    notes.push(`Corte por fala (${aggressiveness}): minGap=${tune.minGap}s padding=${tune.padding}s`);
+    return {
+      segments: computeKeepSegments(subtitles, {
+        paddingStart: tune.padding,
+        paddingEnd: tune.padding,
+        minGap: tune.minGap,
+        totalDuration,
+      }),
+      modeUsed: 'speech',
+      notes,
+    };
+  }
+
+  if (mode === 'scene') {
+    const tune = SCENE_TUNINGS[aggressiveness];
+    notes.push(`Corte por cena (${aggressiveness}): threshold=${tune.threshold}`);
+    const changes = await detectSceneChanges(FFMPEG_BIN, videoPath, tune.threshold);
+    notes.push(`Detected ${changes.length} mudanças de cena`);
+    return {
+      segments: buildKeepSegmentsFromSceneChanges(changes, {
+        totalDuration,
+        windowBefore: tune.windowBefore,
+        windowAfter: tune.windowAfter,
+        mergeGap: tune.mergeGap,
+      }),
+      modeUsed: 'scene',
+      notes,
+    };
+  }
+
+  if (mode === 'ai') {
+    notes.push('Corte inteligente (Claude analisa o transcript)');
+    const result = await aiCutKeepSegments(subtitles, { totalDuration, prompt });
+    if (result.reasons.length > 0) notes.push(...result.reasons);
+    return { segments: result.segments, modeUsed: 'ai', notes };
+  }
+
+  // Defensive: unknown mode → no cut
+  notes.push(`Modo desconhecido "${mode}" — caindo em "sem corte"`);
+  return {
+    segments: [{ start: 0, end: totalDuration, cumulativeRemoved: 0 }],
+    modeUsed: 'none',
+    notes,
+  };
 }
 
 export async function POST(request: NextRequest) {
@@ -107,12 +181,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not yet transcribed' }, { status: 400 });
     }
 
-    // Idempotency: skip if cut.mp4 already exists and metadata reflects it.
     const cutPath = await getJobFilePath(jobId, 'cut.mp4');
+
+    // Idempotency
     if (job.cutPath && job.subtitlesCut && job.subtitlesCut.length > 0) {
       try {
         await fs.access(cutPath);
-        console.log(`[cut-silence] already done for ${jobId}, skipping`);
+        console.log(`[cut] already done for ${jobId}, skipping`);
         if (job.status === 'cutting-silence') {
           await saveJobMetadata(jobId, { status: 'analyzing' });
         }
@@ -127,89 +202,96 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Compute keep segments from subtitle timestamps.
-    const keepSegments = computeKeepSegments(job.subtitles, {
-      paddingStart: PADDING_SECONDS,
-      paddingEnd: PADDING_SECONDS,
-      minGap: MIN_GAP_SECONDS,
-      totalDuration: job.duration,
+    const cutMode: CutMode = job.cutMode ?? 'speech';
+    const aggressiveness: CutAggressiveness = job.cutAggressiveness ?? 'balanced';
+    const totalDuration = job.duration ?? job.subtitles[job.subtitles.length - 1].end;
+
+    console.log(`[cut] mode=${cutMode} aggr=${aggressiveness} duration=${totalDuration}s subs=${job.subtitles.length}`);
+
+    const { segments: keepSegments, modeUsed, notes } = await computeKeepForMode({
+      mode: cutMode,
+      aggressiveness,
+      subtitles: job.subtitles,
+      videoPath: job.normalizedPath,
+      totalDuration,
+      prompt: job.prompt,
     });
 
     if (keepSegments.length === 0) {
-      throw new Error('No keep-segments computed; subtitles list may be empty.');
+      throw new Error('No keep-segments computed.');
     }
 
-    const originalDuration = job.duration ?? keepSegments[keepSegments.length - 1].end;
-    const removedSeconds = totalRemovedSeconds(keepSegments, originalDuration);
+    // SANITY CHECK: never let the cut destroy the video. If the resulting cut would
+    // be < 30% of the source, fall back to keeping the original. This protects
+    // against Whisper hallucinations, scene-detection misfires, or AI overcuts.
+    const kept = keepSegments.reduce((acc, s) => acc + (s.end - s.start), 0);
+    const ratio = totalDuration > 0 ? kept / totalDuration : 1;
+    let usedFallback = false;
+    let effectiveSegments = keepSegments;
+    if (ratio < 0.3) {
+      console.warn(`[cut] kept=${kept.toFixed(2)}s of ${totalDuration.toFixed(2)}s (${(ratio * 100).toFixed(0)}%) — falling back to no-cut`);
+      effectiveSegments = [{ start: 0, end: totalDuration, cumulativeRemoved: 0 }];
+      notes.push(`Fallback: corte teria removido ${((1 - ratio) * 100).toFixed(0)}% do vídeo — desligado por segurança`);
+      usedFallback = true;
+    }
 
-    console.log(
-      `[cut-silence] keep_segments=${keepSegments.length} removed=${removedSeconds.toFixed(2)}s ` +
-      `original=${originalDuration.toFixed(2)}s minGap=${MIN_GAP_SECONDS}`,
-    );
+    const removedSeconds = totalRemovedSeconds(effectiveSegments, totalDuration);
+    console.log(`[cut] keep_segments=${effectiveSegments.length} removed=${removedSeconds.toFixed(2)}s`);
 
-    // If essentially nothing to cut, just symlink-equivalent: copy normalized.mp4 → cut.mp4
-    // and shift subs (which will be a no-op except for index renumbering).
     if (removedSeconds < 0.1) {
-      console.log('[cut-silence] removedSeconds < 0.1, skipping ffmpeg and copying normalized.mp4');
+      console.log('[cut] removedSeconds < 0.1, copying normalized.mp4 → cut.mp4');
       await fs.copyFile(job.normalizedPath, cutPath);
     } else {
       await runFfmpegCut(
         job.normalizedPath,
         cutPath,
-        keepSegments.map((s) => ({ start: s.start, end: s.end })),
+        effectiveSegments.map((s) => ({ start: s.start, end: s.end })),
       );
     }
 
     const stat = await fs.stat(cutPath);
-    if (stat.size === 0) {
-      throw new Error('cut.mp4 output file is empty');
-    }
+    if (stat.size === 0) throw new Error('cut.mp4 output file is empty');
 
-    const subtitlesCut = shiftSubtitles(job.subtitles, keepSegments);
-    const finalDuration = subtitlesCut.length > 0
-      ? subtitlesCut[subtitlesCut.length - 1].end
-      : Math.max(0, originalDuration - removedSeconds);
+    const subtitlesCut = shiftSubtitles(job.subtitles, effectiveSegments);
 
-    // Persist subtitlesCut as a separate file too, mirroring subtitles.json conventions.
     const subsCutPath = await getJobFilePath(jobId, 'subtitles-cut.json');
     await fs.writeFile(subsCutPath, JSON.stringify(subtitlesCut, null, 2));
+
+    const warnings = [...(job.warnings ?? []), ...notes];
+    if (usedFallback) warnings.push('cut-fallback-applied');
 
     await saveJobMetadata(jobId, {
       status: 'analyzing',
       cutPath,
       subtitlesCut,
       silenceCutSeconds: Math.round(removedSeconds * 100) / 100,
+      warnings,
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-    console.log(
-      `✓ Cut silence ${jobId} in ${elapsed}s ` +
-      `(removed ${removedSeconds.toFixed(2)}s, ${keepSegments.length} segments, ` +
-      `final=${finalDuration.toFixed(2)}s)`,
-    );
+    console.log(`✓ Cut(${modeUsed}) ${jobId} in ${elapsed}s (removed ${removedSeconds.toFixed(2)}s, ${effectiveSegments.length} segs, fallback=${usedFallback})`);
 
     return NextResponse.json({
       success: true,
+      mode: modeUsed,
       cutPath,
       removedSeconds: Math.round(removedSeconds * 100) / 100,
-      originalDuration,
-      finalDuration: Math.round(finalDuration * 100) / 100,
-      keepSegments: keepSegments.length,
+      originalDuration: totalDuration,
+      keepSegments: effectiveSegments.length,
+      usedFallback,
+      notes,
     });
   } catch (error) {
     const msg = (error as Error).message ?? String(error);
-    console.error('[cut-silence] FAILED:', msg);
+    console.error('[cut] FAILED:', msg);
 
     if (jobId) {
       await saveJobMetadata(jobId, {
         status: 'error',
-        errorMessage: `Cut silence failed: ${msg.slice(0, 500)}`,
+        errorMessage: `Cut failed: ${msg.slice(0, 500)}`,
       });
     }
 
-    return NextResponse.json(
-      { error: 'Silence cut failed', details: msg },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: 'Video cut failed', details: msg }, { status: 500 });
   }
 }

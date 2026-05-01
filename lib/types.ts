@@ -2,6 +2,22 @@ export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'sp
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'exciting';
 export type JobStatus = 'uploading' | 'normalizing' | 'transcribing' | 'cutting-silence' | 'analyzing' | 'editing' | 'rendering' | 'done' | 'error';
 
+/**
+ * Cut mode — how the video should be trimmed during the cut-silence step.
+ *
+ * - `none`     : do not cut; keep the full normalized video
+ * - `speech`   : cut audio gaps (silences) between subtitle ranges
+ * - `scene`    : cut visually-static segments (where no scene change is detected)
+ * - `ai`       : Claude reads the transcript and picks the best segments to keep
+ */
+export type CutMode = 'none' | 'speech' | 'scene' | 'ai';
+
+/**
+ * How aggressive the cut should be. Maps to gap thresholds (speech) or
+ * scene-change thresholds (scene). Ignored for `none` and `ai`.
+ */
+export type CutAggressiveness = 'subtle' | 'balanced' | 'aggressive';
+
 export interface Word {
   word: string;
   start: number;
@@ -70,6 +86,12 @@ export interface JobMetadata {
   updatedAt: string;
   legendar?: boolean;
   animator?: boolean;
+  /** Cut strategy chosen by the user at upload time. Defaults to 'speech' on legacy jobs. */
+  cutMode?: CutMode;
+  /** Cut intensity (only relevant for 'speech' and 'scene'). Defaults to 'balanced'. */
+  cutAggressiveness?: CutAggressiveness;
+  /** Soft warnings the pipeline produced (e.g. detected hallucination, fallback applied). */
+  warnings?: string[];
 }
 
 export interface PipelineStep {
