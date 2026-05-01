@@ -67,13 +67,21 @@ export async function POST(request: NextRequest) {
     }
     const scene = scenes[sceneIdx];
 
-    const prompt = (overridePrompt && overridePrompt.trim()) || scene.imagePrompt || '';
-    if (!prompt) {
+    const rawPrompt = (overridePrompt && overridePrompt.trim()) || scene.imagePrompt || '';
+    if (!rawPrompt) {
       return NextResponse.json(
         { error: `Scene '${sceneId}' has no imagePrompt` },
         { status: 400 },
       );
     }
+
+    // Hard-enforce pt-BR for any text rendered inside the image. Even if Claude
+    // forgets to add this instruction (or the user overrides the prompt), we
+    // append it deterministically so generated illustrations don't ship English
+    // captions/typography. Belt-and-suspenders to the prompt rules in analyze/route.ts.
+    const ptBRSuffix = ' All visible text, letters, captions, titles, and typography in the image MUST be written in Brazilian Portuguese (pt-BR). Do not include any English words, slogans, or watermarks. If text is shown, it must be in correct, idiomatic Portuguese as spoken in Brazil.';
+    const alreadyHasPtBR = /portuguese|pt[\s\-]?br|brazil/i.test(rawPrompt);
+    const prompt = alreadyHasPtBR ? rawPrompt : rawPrompt + ptBRSuffix;
 
     // Ensure images dir exists
     const imagesDir = path.dirname(await getJobFilePath(jobId, `images/${sceneId}.png`));

@@ -4,7 +4,7 @@ import { KeepSegment } from './silence';
 const Anthropic = require('@anthropic-ai/sdk').default;
 const { jsonrepair } = require('jsonrepair');
 
-const SYSTEM_PROMPT = `Você é um editor de vídeo profissional especializado em conteúdo viral curto (TikTok, Reels, Shorts).
+const SYSTEM_PROMPT = `Você é um Editor de Vídeo Profissional com IA, especializado em conteúdo viral curto (TikTok, Reels, Shorts). Todo texto que você gerar (incluindo o campo "reason") deve estar em português brasileiro (pt-BR).
 
 Sua tarefa: ler a transcrição com timestamps de um vídeo e decidir QUAIS TRECHOS manter no corte final.
 

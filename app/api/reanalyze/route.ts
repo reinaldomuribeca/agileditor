@@ -27,7 +27,18 @@ function extractJSON(raw: string): Analysis {
   }
 }
 
-const VIRAL_SYSTEM_PROMPT = `Você é um Editor de Vídeos Viral Especialista, com conhecimento profundo em técnicas de editores famosos como MrBeast, Ali Abdaal e criadores de conteúdo do TikTok. Sua missão é transformar vídeos brutos em conteúdo hipnotizante, pronto para viralizar no TikTok, YouTube Shorts e Instagram Reels.
+const VIRAL_SYSTEM_PROMPT = `Você é um Editor de Vídeo Profissional com IA. Domínios:
+- Identificação de cenas por corte, transição e conteúdo visual
+- Análise de ritmo, emoção e narrativa
+- Sincronização de áudio, trilha sonora e narração
+- Geração e inserção de ilustrações animadas nas cenas
+- Criação de títulos tipográficos contextuais no início do vídeo
+- Legendagem automática sincronizada com o áudio
+
+Suas referências de estilo são MrBeast, Ali Abdaal e os top criadores do TikTok BR. Missão: transformar vídeos brutos em conteúdo hipnotizante para TikTok, YouTube Shorts e Reels.
+
+REGRA NÃO-NEGOCIÁVEL DE IDIOMA:
+Todo conteúdo textual gerado por você (titles, descriptions, image prompts, hook, summary, visualElements) DEVE estar em PORTUGUÊS BRASILEIRO (pt-BR). Image prompts em inglês são aceitos APENAS se o prompt instruir o modelo de imagem a renderizar TODO o texto visual em português brasileiro — ou seja, qualquer letra/palavra que apareça na imagem final deve estar em pt-BR.
 
 TÉCNICAS OBRIGATÓRIAS:
 - Gancho crítico nos primeiros 3-4 segundos (deve impedir o scroll)
@@ -44,14 +55,7 @@ PRINCÍPIOS NÃO-NEGOCIÁVEIS:
 3. O gancho (primeiros 3s) é a cena mais importante
 4. Remover todo momento morto e silêncio desnecessário
 
-Quando analyzer o vídeo, identifique:
-- O melhor gancho (momento mais impactante para abrir)
-- Pontos de drama/surpresa/revelação
-- Números e dados que merecem animação
-- Picos emocionais
-- Transições narrativas
-
-Responda SOMENTE com JSON válido, sem markdown.`;
+Antes de gerar JSON, leia o CONTEXTO DO USUÁRIO (se fornecido) e siga cada instrução com precisão. Responda SOMENTE com JSON válido, sem markdown, sem comentários.`;
 
 export async function POST(request: NextRequest) {
   let jobId: string | undefined;
@@ -135,7 +139,7 @@ FORMATO DE RESPOSTA (JSON puro, sem markdown):
       "sentiment": "positive|negative|neutral|exciting",
       "colorPalette": ["#HEX1", "#HEX2", "#HEX3"],
       "visualElements": ["elemento1", "elemento2"],
-      "imagePrompt": "Prompt DALL-E para ilustração",
+      "imagePrompt": "Prompt em inglês para o gpt-image-1 com instrução EXPLÍCITA de que QUALQUER texto/letras na imagem devem estar em PORTUGUÊS BRASILEIRO. Ex: 'Bold typography poster with the words \"X Y Z\" in Portuguese (Brazilian), neon yellow ...'",
       "animationType": "zoom_in|shake|bounce|none",
       "pacing": "fast|normal|breathe"
     }
@@ -147,6 +151,10 @@ REGRAS DAS CENAS:
 - Criar 3-7 cenas baseadas no ritmo viral
 - Títulos em MAIÚSCULAS ou impactantes
 - Cada cena deve ter um motivo claro para manter o espectador
+
+REGRAS DE IDIOMA (pt-BR — não-negociável):
+- title, description, hook, summary, visualElements: SEMPRE em português brasileiro
+- imagePrompt: pode ser escrito em inglês MAS deve incluir "in Brazilian Portuguese" / "Portuguese (BR)" em qualquer parte que peça texto/letras visíveis na imagem. Nunca peça texto em inglês na imagem.
 
 REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
 - startLeg é o índice [N] de uma legenda EXISTENTE na transcrição acima.
