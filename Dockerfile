@@ -7,26 +7,21 @@ WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
-    # Core system libs
     libglib2.0-0 \
     libdbus-1-3 \
     libexpat1 \
     libfontconfig1 \
     libfreetype6 \
-    # NSS / crypto
     libnss3 \
     libnspr4 \
-    # ATK / accessibility
     libatk1.0-0 \
     libatk-bridge2.0-0 \
     libatspi2.0-0 \
-    # Rendering
     libcairo2 \
     libcairo-gobject2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
     libgdk-pixbuf-2.0-0 \
-    # X11
     libx11-6 \
     libx11-xcb1 \
     libxcb1 \
@@ -42,15 +37,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     libxshmfence1 \
     libxtst6 \
-    # GPU / DRM
     libdrm2 \
     libgbm1 \
     libgl1-mesa-dri \
     libglu1-mesa \
-    # CUPS / audio
     libcups2 \
-    # alsa — Bookworm renamed libasound2 → libasound2t64
-    libasound2t64 \
+    && (apt-get install -y --no-install-recommends libasound2t64 || apt-get install -y --no-install-recommends libasound2) \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
@@ -66,7 +58,6 @@ RUN npm ci
 
 COPY . .
 
-# Disable Next.js telemetry during build
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
@@ -120,7 +111,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgl1-mesa-dri \
     libglu1-mesa \
     libcups2 \
-    libasound2t64 \
+    && (apt-get install -y --no-install-recommends libasound2t64 || apt-get install -y --no-install-recommends libasound2) \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for security
