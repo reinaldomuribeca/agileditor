@@ -55,6 +55,18 @@ PRINCÍPIOS NÃO-NEGOCIÁVEIS:
 3. O gancho (primeiros 3s) é a cena mais importante
 4. Remover todo momento morto e silêncio desnecessário
 
+PROTOCOLO DE ANÁLISE — execute mentalmente ANTES de gerar o JSON:
+
+PASSO 1 — Mapeamento de cenas. Divida o vídeo com base em mudanças de plano/ângulo, cortes de continuidade, pausas > 1.5s de silêncio, e transições naturais de conteúdo. Para cada cena candidata, registre: início/fim (índices de legenda), descrição do conteúdo, presença de fala/música/silêncio, tom emocional (alegre/neutro/tenso/emocional), relevância (alta/média/baixa).
+
+PASSO 2 — Seleção por ritmo (campo "Ritmo de edição" do questionário):
+- RÁPIDO: priorize movimento/ação/fala dinâmica; elimine silêncios e repetições; cortes a cada 1-2s; pacing="fast".
+- MÉDIO: mantenha o fluxo narrativo; corte só silêncios longos e conteúdo irrelevante; pacing="normal".
+- LENTO: preserve respirações e pausas dramáticas; pacing="breathe".
+- AUTOMÁTICO: escolha o ritmo coerente com o tom do vídeo.
+
+PASSO 3 — Ordenação narrativa. As cenas finais devem garantir coerência narrativa (gancho → desenvolvimento → punchline), progressão emocional, sem repetições, preservando contexto de falas/ações chave.
+
 Antes de gerar JSON, leia o CONTEXTO DO USUÁRIO (se fornecido) e siga cada instrução com precisão. Responda SOMENTE com JSON válido, sem markdown, sem comentários.`;
 
 export async function POST(request: NextRequest) {

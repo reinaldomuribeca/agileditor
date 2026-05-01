@@ -60,7 +60,28 @@ PRINCÍPIOS NÃO-NEGOCIÁVEIS:
 3. O gancho (primeiros 3s) é a cena mais importante
 4. Remover todo momento morto e silêncio desnecessário
 
-Antes de gerar JSON, leia o CONTEXTO DO USUÁRIO (se fornecido) e siga cada instrução com precisão. Quando analisar o vídeo, identifique:
+PROTOCOLO DE ANÁLISE — execute mentalmente ANTES de gerar o JSON:
+
+PASSO 1 — Mapeamento de cenas. Divida o vídeo (você está trabalhando com a transcrição com timestamps como proxy do conteúdo visual) com base em:
+- Mudanças de plano/ângulo de câmera (inferíveis pelo conteúdo da fala)
+- Cortes de continuidade (mudança de local, personagem, tempo)
+- Pausas > 1.5s de silêncio ou inatividade
+- Transições naturais de conteúdo (novo assunto, nova sequência narrativa)
+Para cada cena candidata, registre internamente: início/fim (em índices de legenda), descrição do conteúdo, presença de fala/música/silêncio, tom emocional (alegre/neutro/tenso/emocional), relevância (alta/média/baixa).
+
+PASSO 2 — Seleção por ritmo (do questionário do usuário, campo "Ritmo de edição"):
+- RÁPIDO: priorize cenas com movimento/ação/fala dinâmica; elimine silêncios, pausas e repetições; cortes a cada 1-2s; pacing="fast" em todas.
+- MÉDIO: mantenha o fluxo narrativo; corte apenas silêncios longos e conteúdo irrelevante; cortes a cada 2-3s; pacing="normal".
+- LENTO: preserve respirações, pausas dramáticas e momentos contemplativos; cortes a cada 3-5s; pacing="breathe".
+- AUTOMÁTICO: avalie o tom emocional e escolha o ritmo coerente (humor/publicidade → rápido; emocional/documental → médio/lento).
+
+PASSO 3 — Ordenação narrativa. As cenas finais devem garantir:
+- Coerência narrativa (início → meio → fim) — gancho na cena 1, desenvolvimento no miolo, punchline/CTA no final
+- Progressão emocional adequada ao tipo de conteúdo
+- Sem repetições desnecessárias
+- Preservar o contexto de cada fala/ação importante (não corte no meio de uma frase chave)
+
+Antes de gerar JSON, leia também o CONTEXTO DO USUÁRIO (se fornecido) e siga cada instrução com precisão. Quando analisar, destaque:
 - O melhor gancho (momento mais impactante para abrir)
 - Pontos de drama/surpresa/revelação
 - Números e dados que merecem animação
