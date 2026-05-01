@@ -89,27 +89,37 @@ export async function POST(request: NextRequest) {
         outputPath,
         `--props=${propsFile}`,
         '--codec=h264',
-        '--log=error',
+        '--gl=swiftshader',       // software rendering — required in headless Docker (no GPU)
+        '--log=verbose',
       ],
       {
         cwd: remotionDir,
-        env: { ...process.env, NODE_ENV: 'production' },
+        env: {
+          ...process.env,
+          NODE_ENV: 'production',
+          DISPLAY: '',            // ensure no X11 display is expected
+        },
         stdio: ['ignore', 'pipe', 'pipe'],
       }
     );
 
-    child.stdout?.on('data', (d) => process.stdout.write(d));
-    child.stderr?.on('data', (d) => process.stderr.write(d));
+    let stderrBuf = '';
+    child.stdout?.on('data', (d: Buffer) => process.stdout.write(d));
+    child.stderr?.on('data', (d: Buffer) => {
+      process.stderr.write(d);
+      stderrBuf = (stderrBuf + d.toString()).slice(-3000);
+    });
 
     child.on('close', async (code) => {
       if (code === 0) {
         console.log(`✓ Render complete: ${jobId}`);
         await saveJobMetadata(jobId!, { status: 'done', outputPath });
       } else {
-        console.error(`✗ Render failed (exit ${code}): ${jobId}`);
+        const snippet = stderrBuf.slice(-500);
+        console.error(`✗ Render failed (exit ${code}): ${jobId}\n${snippet}`);
         await saveJobMetadata(jobId!, {
           status: 'error',
-          errorMessage: `Remotion render exited with code ${code}`,
+          errorMessage: `Remotion render exited with code ${code}: ${snippet}`,
         });
       }
     });

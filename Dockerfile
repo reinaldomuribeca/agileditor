@@ -3,27 +3,54 @@ FROM node:20-slim AS deps
 
 WORKDIR /app
 
-# Install system libs needed by @remotion/renderer (Chromium) and @ffmpeg-installer
+# Chromium (Remotion) + FFmpeg runtime deps for Debian Bookworm
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     curl \
+    # Core system libs
+    libglib2.0-0 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libfreetype6 \
+    # NSS / crypto
     libnss3 \
+    libnspr4 \
+    # ATK / accessibility
     libatk1.0-0 \
     libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
+    libatspi2.0-0 \
+    # Rendering
+    libcairo2 \
+    libcairo-gobject2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    # X11
+    libx11-6 \
     libx11-xcb1 \
+    libxcb1 \
+    libxcb-dri3-0 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxrender1 \
     libxshmfence1 \
+    libxtst6 \
+    # GPU / DRM
+    libdrm2 \
+    libgbm1 \
+    libgl1-mesa-dri \
     libglu1-mesa \
+    # CUPS / audio
+    libcups2 \
+    # alsa — Bookworm renamed libasound2 → libasound2t64
+    libasound2t64 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY package.json package-lock.json ./
@@ -35,15 +62,16 @@ FROM node:20-slim AS builder
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-# Need devDeps for the build (tsx, types…)
 RUN npm ci
 
 COPY . .
 
-# Build Next.js (outputs to .next/)
+# Disable Next.js telemetry during build
+ENV NEXT_TELEMETRY_DISABLED=1
+
 RUN npm run build
 
-# Build Remotion bundle (outputs to remotion/out/)
+# Install and pre-bundle Remotion subproject
 RUN cd remotion && npm ci && npm run build 2>/dev/null || true
 
 # ── Stage 3: runner ──────────────────────────────────────────────────────────
@@ -52,45 +80,66 @@ FROM node:20-slim AS runner
 WORKDIR /app
 
 ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Same runtime libs as deps stage
+# Same Chromium/FFmpeg runtime libs as deps stage
 RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
+    libglib2.0-0 \
+    libdbus-1-3 \
+    libexpat1 \
+    libfontconfig1 \
+    libfreetype6 \
     libnss3 \
+    libnspr4 \
     libatk1.0-0 \
     libatk-bridge2.0-0 \
-    libcups2 \
-    libdrm2 \
-    libxkbcommon0 \
-    libxcomposite1 \
-    libxdamage1 \
-    libxfixes3 \
-    libxrandr2 \
-    libgbm1 \
-    libasound2 \
+    libatspi2.0-0 \
+    libcairo2 \
+    libcairo-gobject2 \
     libpango-1.0-0 \
     libpangocairo-1.0-0 \
+    libgdk-pixbuf-2.0-0 \
+    libx11-6 \
     libx11-xcb1 \
+    libxcb1 \
+    libxcb-dri3-0 \
+    libxcomposite1 \
+    libxcursor1 \
+    libxdamage1 \
+    libxext6 \
+    libxfixes3 \
+    libxi6 \
+    libxkbcommon0 \
+    libxrandr2 \
+    libxrender1 \
     libxshmfence1 \
+    libxtst6 \
+    libdrm2 \
+    libgbm1 \
+    libgl1-mesa-dri \
     libglu1-mesa \
+    libcups2 \
+    libasound2t64 \
     && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for security
 RUN groupadd --gid 1001 nodejs && \
     useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home nextjs
 
-# Copy production node_modules from deps stage
+# Production node_modules from deps stage
 COPY --from=deps /app/node_modules ./node_modules
 
-# Copy built app from builder stage
+# Built Next.js app
 COPY --from=builder /app/.next ./.next
 COPY --from=builder /app/public ./public
 COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/next.config.* ./
-# Copy remotion bundle if built
+
+# Remotion subproject with its own node_modules + pre-built bundle
 COPY --from=builder /app/remotion ./remotion
 
-# Persistent storage volume mount point
+# Persistent storage volume
 RUN mkdir -p /data/jobs && chown -R nextjs:nodejs /data
 
 USER nextjs
