@@ -1,8 +1,7 @@
 # ── Ágil Editor — Caddyfile ──────────────────────────────────────────────────
-# Replace seudominio.com with your real domain before deploying.
 # Caddy obtains TLS automatically via Let's Encrypt (needs ports 80+443 open).
 
-seudominio.com {
+editor.agiltime.com.br {
     # Forward all traffic to the Next.js container
     reverse_proxy app:3333
 

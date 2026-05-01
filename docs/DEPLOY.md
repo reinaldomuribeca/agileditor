@@ -38,7 +38,7 @@ Variáveis obrigatórias:
 | `SESSION_SECRET` | string aleatória longa (32+ chars) |
 | `ANTHROPIC_API_KEY` | sk-ant-... |
 | `OPENAI_API_KEY` | sk-... |
-| `NEXT_PUBLIC_APP_URL` | https://seudominio.com |
+| `NEXT_PUBLIC_APP_URL` | https://editor.agiltime.com.br |
 | `JOBS_DIR` | /data/jobs |
 
 ---
@@ -46,8 +46,8 @@ Variáveis obrigatórias:
 ## 3. Configurar domínio no Caddyfile
 
 ```bash
-# Troque seudominio.com pelo seu domínio real
-sed -i 's/seudominio.com/meudominio.com/g' Caddyfile
+# Troque editor.agiltime.com.br pelo seu domínio real
+sed -i 's/editor.agiltime.com.br/meudominio.com/g' Caddyfile
 ```
 
 Certifique-se de que:
@@ -81,7 +81,7 @@ O Caddy vai obter o certificado TLS automaticamente na primeira requisição.
 docker compose logs -f app
 
 # Health check
-curl https://seudominio.com/api/health
+curl https://editor.agiltime.com.br/api/health
 # Esperado: { "status": "ok", "version": "0.1.0", ... }
 ```
 
