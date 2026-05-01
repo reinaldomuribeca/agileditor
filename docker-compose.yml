@@ -1,0 +1,52 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: agil-editor:latest
+    container_name: agil-editor
+    restart: unless-stopped
+    env_file:
+      - .env          # Copy .env.local → .env on the server (never commit secrets)
+    environment:
+      PORT: "3333"
+      HOST: "0.0.0.0"
+      JOBS_DIR: /data/jobs
+    volumes:
+      - jobs_data:/data/jobs
+    expose:
+      - "3333"
+    networks:
+      - web
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3333/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  caddy:
+    image: caddy:2-alpine
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"     # HTTP/3
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - web
+    depends_on:
+      - app
+
+volumes:
+  jobs_data:
+  caddy_data:
+  caddy_config:
+
+networks:
+  web:
+    driver: bridge

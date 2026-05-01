@@ -1,0 +1,32 @@
+# ── Ágil Editor — Caddyfile ──────────────────────────────────────────────────
+# Replace seudominio.com with your real domain before deploying.
+# Caddy obtains TLS automatically via Let's Encrypt (needs ports 80+443 open).
+
+seudominio.com {
+    # Forward all traffic to the Next.js container
+    reverse_proxy app:3333
+
+    # Upload endpoint can receive large video files
+    request_body {
+        max_size 220MB
+    }
+
+    # Security headers
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options nosniff
+        X-Frame-Options SAMEORIGIN
+        Referrer-Policy strict-origin-when-cross-origin
+        -Server
+    }
+
+    # Compress responses
+    encode gzip
+
+    log {
+        output file /var/log/caddy/agil-editor.log {
+            roll_size 10MB
+            roll_keep 5
+        }
+    }
+}
