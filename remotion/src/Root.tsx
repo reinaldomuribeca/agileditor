@@ -19,7 +19,7 @@ export default function Root() {
       width={1080}
       height={1920}
       defaultProps={defaultProps}
-      calculateMetadata={async ({ props }) => {
+      calculateMetadata={async ({ props }: { props: Record<string, unknown> }) => {
         const p = props as unknown as VideoCompositionProps;
         if (!p.scenes || p.scenes.length === 0) return { durationInFrames: 300 };
         const lastScene = p.scenes[p.scenes.length - 1];
