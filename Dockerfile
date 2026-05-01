@@ -122,16 +122,21 @@ RUN groupadd --gid 1001 nodejs && \
     useradd --uid 1001 --gid nodejs --shell /bin/bash --create-home nextjs
 
 # Production node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules ./node_modules
 
 # Built Next.js app
-COPY --from=builder /app/.next ./.next
-COPY --from=builder /app/public ./public
-COPY --from=builder /app/package.json ./package.json
-COPY --from=builder /app/next.config.* ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next ./.next
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=nextjs:nodejs /app/next.config.* ./
 
-# Remotion subproject with its own node_modules + pre-built bundle
-COPY --from=builder /app/remotion ./remotion
+# Remotion subproject with its own node_modules + pre-built bundle.
+# Wipe webpack cache from build stage so runtime user starts clean and can
+# write/delete inside .cache/webpack without EACCES.
+COPY --from=builder --chown=nextjs:nodejs /app/remotion ./remotion
+RUN rm -rf /app/remotion/node_modules/.cache && \
+    mkdir -p /app/remotion/node_modules/.cache && \
+    chown -R nextjs:nodejs /app/remotion
 
 # Pre-download the Chromium build that @remotion/renderer needs into a path
 # the non-root user can read. Without this, Remotion tries to download
