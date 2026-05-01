@@ -98,6 +98,11 @@ export async function POST(request: NextRequest) {
           ...process.env,
           NODE_ENV: 'production',
           DISPLAY: '',            // ensure no X11 display is expected
+          // Tell Remotion where the pre-downloaded Chromium lives. Set in Dockerfile.
+          // Falls back to a writable dir under /tmp when running outside Docker.
+          REMOTION_BROWSER_CACHE: process.env.REMOTION_BROWSER_CACHE || '/tmp/remotion-browser',
+          // Some libs respect HOME for cache dirs
+          HOME: process.env.HOME || '/tmp',
         },
         stdio: ['ignore', 'pipe', 'pipe'],
       }
