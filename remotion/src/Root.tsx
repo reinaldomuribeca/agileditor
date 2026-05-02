@@ -7,6 +7,7 @@ const defaultProps: VideoCompositionProps = {
   scenes: [],
   subtitles: [],
   videoSrc: '',
+  soundtrack: undefined,
 };
 
 export default function Root() {

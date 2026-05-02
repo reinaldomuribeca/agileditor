@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getJobMetadata, saveJobMetadata, getJobFilePath } from '@/lib/storage';
 import { convertScenesFromLegendaIndex } from '@/lib/scenes';
+import { pickSoundtrack } from '@/lib/soundtrack';
 import { spawn } from 'child_process';
 import path from 'path';
 import fs from 'fs/promises';
@@ -39,15 +40,21 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No scenes to render' }, { status: 400 });
     }
 
-    // Special case: the user-defined intro title (type='intro') gets a fixed 3s
-    // overlay window regardless of subtitle timing. It overlaps with whatever
-    // scene starts after — that's fine: intro is a centered text overlay, the
-    // next scene is corner-positioned, they compose without visual conflict.
-    const INTRO_DURATION_FRAMES = 90; // 3s @ 30fps
+    // Special case: scenes with a fixed overlay duration regardless of subtitle timing.
+    //   intro = 3.0s — user-defined branded title (centered text)
+    //   hook  = 2.5s — pattern-interrupt overlay forced to grab scroll in the first beats
+    // Both overlap whatever scene starts after — that's fine: they're centered text
+    // overlays, follow-up scenes are corner-positioned, they compose without visual conflict.
+    const INTRO_DURATION_FRAMES = 90; // 3.0s @ 30fps
+    const HOOK_DURATION_FRAMES  = 75; // 2.5s @ 30fps
     const scenesWithFrames = rawScenesWithFrames.map((s) => {
       if (s.type === 'intro') {
         const newEnd = s.startFrame + INTRO_DURATION_FRAMES;
         return { ...s, endFrame: newEnd, durationFrames: INTRO_DURATION_FRAMES };
+      }
+      if (s.type === 'hook') {
+        const newEnd = s.startFrame + HOOK_DURATION_FRAMES;
+        return { ...s, endFrame: newEnd, durationFrames: HOOK_DURATION_FRAMES };
       }
       return s;
     });
@@ -72,10 +79,21 @@ export async function POST(request: NextRequest) {
       imageUrl: s.imageUrl?.startsWith('/') ? `${internalUrl}${s.imageUrl}` : s.imageUrl,
     }));
 
+    const soundtrackPick = await pickSoundtrack(job.questionnaire, jobId);
+    const soundtrack = soundtrackPick
+      ? { ...soundtrackPick, src: `${internalUrl}${soundtrackPick.src}` }
+      : undefined;
+    if (job.questionnaire?.music?.enabled && !soundtrack) {
+      console.log(`[render] music requested (style=${job.questionnaire.music.style}) but no audio file found in public/music/${job.questionnaire.music.style}/`);
+    } else if (soundtrack) {
+      console.log(`[render] soundtrack: ${soundtrack.src} (base=${soundtrack.baseVolume}, ducked=${soundtrack.duckedVolume})`);
+    }
+
     await fs.writeFile(propsFile, JSON.stringify({
       scenes: scenesAbs,
       subtitles: effectiveSubs,
       videoSrc,
+      soundtrack,
     }));
 
     // Mark job as rendering immediately
@@ -95,6 +113,9 @@ export async function POST(request: NextRequest) {
     }
     console.log(`[render] using remotion bin: ${remotionBin}`);
 
+    const glMode = process.env.REMOTION_GL || 'swiftshader';
+    const concurrency = process.env.RENDER_CONCURRENCY || '4';
+
     const child = spawn(
       remotionBin,
       [
@@ -104,8 +125,9 @@ export async function POST(request: NextRequest) {
         outputPath,
         `--props=${propsFile}`,
         '--codec=h264',
-        '--gl=swiftshader',       // software rendering — required in headless Docker (no GPU)
-        '--log=verbose',
+        `--gl=${glMode}`,
+        `--concurrency=${concurrency}`,
+        '--log=error',
       ],
       {
         cwd: remotionDir,

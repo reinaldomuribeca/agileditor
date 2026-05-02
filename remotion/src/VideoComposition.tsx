@@ -1,12 +1,13 @@
-import React from 'react';
-import { AbsoluteFill, Sequence, Video, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
-import { SubtitleData, SceneData } from './types';
+import React, { useMemo } from 'react';
+import { AbsoluteFill, Audio, Sequence, Video, useCurrentFrame, useVideoConfig, interpolate, spring } from 'remotion';
+import { SubtitleData, SceneData, SoundtrackData } from './types';
 import TalkingHeadScene from './scenes/TalkingHeadScene';
 import TextOnlyScene from './scenes/TextOnlyScene';
 import CalloutScene from './scenes/CalloutScene';
 import SplitScene from './scenes/SplitScene';
 import CoverScene from './scenes/CoverScene';
 import IntroScene from './scenes/IntroScene';
+import HookScene from './scenes/HookScene';
 import SubtitleOverlay from './components/SubtitleOverlay';
 
 export interface SceneWithFrames extends SceneData {
@@ -19,6 +20,7 @@ export interface VideoCompositionProps {
   scenes: SceneWithFrames[];
   subtitles: SubtitleData[];
   videoSrc?: string;
+  soundtrack?: SoundtrackData;
 }
 
 function sentimentFilter(sentiment: string): string {
@@ -26,7 +28,7 @@ function sentimentFilter(sentiment: string): string {
     case 'exciting':  return 'saturate(1.55) contrast(1.18) brightness(1.08)';
     case 'positive':  return 'saturate(1.25) brightness(1.06)';
     case 'negative':  return 'saturate(0.68) contrast(1.14) brightness(0.9)';
-    default:          return 'saturate(1.0) contrast(1.0) brightness(1.0)';
+    default:          return 'none';
   }
 }
 
@@ -39,7 +41,7 @@ function VideoWithEffects({ scenes, videoSrc }: { scenes: SceneWithFrames[]; vid
   let scaleVal   = 1;
   let txPx       = 0;
   let tyPx       = 0;
-  let filterStr  = 'saturate(1) contrast(1) brightness(1)';
+  let filterStr  = 'none';
 
   if (activeScene) {
     const local = frame - activeScene.startFrame;
@@ -87,7 +89,6 @@ function VideoWithEffects({ scenes, videoSrc }: { scenes: SceneWithFrames[]; vid
         transform,
         filter: filterStr,
         transformOrigin: 'center center',
-        willChange: 'transform, filter',
       }}
     />
   );
@@ -95,6 +96,7 @@ function VideoWithEffects({ scenes, videoSrc }: { scenes: SceneWithFrames[]; vid
 
 function SceneOverlay({ scene, durationFrames }: { scene: SceneData; durationFrames: number }) {
   switch (scene.type) {
+    case 'hook':         return <HookScene scene={scene} durationFrames={durationFrames} />;
     case 'intro':        return <IntroScene scene={scene} durationFrames={durationFrames} />;
     case 'talking_head': return <TalkingHeadScene scene={scene} durationFrames={durationFrames} />;
     case 'text_only':    return <TextOnlyScene scene={scene} durationFrames={durationFrames} />;
@@ -105,9 +107,88 @@ function SceneOverlay({ scene, durationFrames }: { scene: SceneData; durationFra
   }
 }
 
-export default function VideoComposition({ scenes, subtitles, videoSrc }: VideoCompositionProps) {
+const CROSSFADE_FRAMES = 8;
+
+/**
+ * Sidechain-style ducking: music drops while speech is active and recovers
+ * gently when it stops. Asymmetric envelope mirrors how a human audio engineer
+ * would set a compressor — fast attack so voice cuts through immediately,
+ * slow release so the music doesn't pop back up between breaths.
+ */
+function Soundtrack({ soundtrack, subtitles }: { soundtrack: SoundtrackData; subtitles: SubtitleData[] }) {
+  const { fps, durationInFrames } = useVideoConfig();
+  const { src, baseVolume, duckedVolume } = soundtrack;
+
+  const volumes = useMemo(() => {
+    const out = new Float32Array(durationInFrames);
+    if (durationInFrames === 0) return out;
+
+    // Step 1 — per-frame target volume (binary: ducked while any subtitle is speaking)
+    const targets = new Float32Array(durationInFrames);
+    for (let f = 0; f < durationInFrames; f++) {
+      const t = f / fps;
+      let speaking = false;
+      for (const s of subtitles) {
+        if (s.start <= t && s.end > t) { speaking = true; break; }
+      }
+      targets[f] = speaking ? duckedVolume : baseVolume;
+    }
+
+    // Step 2 — asymmetric envelope smoothing
+    //   attack (target < cur, voice starts) ~100 ms → coeff 0.35
+    //   release (target > cur, voice stops) ~330 ms → coeff 0.10
+    let cur = targets[0];
+    for (let i = 0; i < durationInFrames; i++) {
+      const t = targets[i];
+      const coeff = t < cur ? 0.35 : 0.10;
+      cur += (t - cur) * coeff;
+      out[i] = cur;
+    }
+    return out;
+  }, [subtitles, durationInFrames, fps, baseVolume, duckedVolume]);
+
+  return (
+    <Audio
+      src={src}
+      volume={(f: number) => volumes[f] ?? baseVolume}
+      loop
+    />
+  );
+}
+
+function CrossfadeWrapper({
+  naturalDuration,
+  addTail,
+  children,
+}: {
+  naturalDuration: number;
+  addTail: boolean;
+  children: React.ReactNode;
+}) {
+  const frame = useCurrentFrame();
+  const tailOpacity = addTail
+    ? interpolate(
+        frame,
+        [naturalDuration, naturalDuration + CROSSFADE_FRAMES],
+        [1, 0],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      )
+    : 1;
+  return (
+    <AbsoluteFill style={{ opacity: tailOpacity, pointerEvents: 'none' }}>
+      {children}
+    </AbsoluteFill>
+  );
+}
+
+export default function VideoComposition({ scenes, subtitles, videoSrc, soundtrack }: VideoCompositionProps) {
   return (
     <AbsoluteFill style={{ backgroundColor: '#000', overflow: 'hidden' }}>
+
+      {/* ── 0. Background music with sidechain-style ducking ───── */}
+      {soundtrack?.src && (
+        <Soundtrack soundtrack={soundtrack} subtitles={subtitles} />
+      )}
 
       {/* ── 1. Video with dynamic effects (zoom, shake, color grade) */}
       {videoSrc ? (
@@ -120,12 +201,19 @@ export default function VideoComposition({ scenes, subtitles, videoSrc }: VideoC
         </AbsoluteFill>
       )}
 
-      {/* ── 2. Scene overlays (text/labels on top of video) ─────── */}
-      {scenes.map((scene) => {
-        const duration = Math.max(scene.durationFrames, 1);
+      {/* ── 2. Scene overlays with crossfade (each scene's tail overlaps the next by CROSSFADE_FRAMES) */}
+      {scenes.map((scene, idx) => {
+        const duration  = Math.max(scene.durationFrames, 1);
+        const isLast    = idx === scenes.length - 1;
+        const tail      = isLast ? 0 : CROSSFADE_FRAMES;
+        // Pass extended duration so inner exitFade triggers later — wrapper handles the visible crossfade.
+        const innerDur  = duration + tail;
+        const seqDur    = duration + tail;
         return (
-          <Sequence key={scene.id} from={scene.startFrame} durationInFrames={duration}>
-            <SceneOverlay scene={scene} durationFrames={duration} />
+          <Sequence key={scene.id} from={scene.startFrame} durationInFrames={seqDur}>
+            <CrossfadeWrapper naturalDuration={duration} addTail={!isLast}>
+              <SceneOverlay scene={scene} durationFrames={innerDur} />
+            </CrossfadeWrapper>
           </Sequence>
         );
       })}

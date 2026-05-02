@@ -79,14 +79,15 @@ export async function POST(request: NextRequest) {
     // We prepend a style modifier so every scene shares a consistent visual look,
     // even if Claude varied the imagePrompt phrasing.
     const STYLE_HINTS: Record<string, string> = {
-      minimal:     'Minimalist clean flat illustration, lots of whitespace, simple geometric shapes, modern editorial look. ',
-      cartoon:     '2D cartoon illustration, playful character art, bold outlines, vibrant flat colors. ',
-      arrows:      'Hand-drawn vlog/tutorial annotation style, sketchy arrows, circles, underlines, marker-pen aesthetic over a solid background. ',
-      infographic: 'Infographic style with charts, large numbers, icons, data-viz aesthetic, clean editorial layout. ',
-      comic:       'Comic-book panel illustration, halftone dots, bold ink lines, action burst/onomatopoeia, retro HQ feel. ',
+      minimal:     'Minimalist clean flat illustration, transparent background, simple geometric shapes, modern editorial look. ',
+      cartoon:     '2D cartoon illustration, transparent background, playful character art, bold outlines, vibrant flat colors. ',
+      arrows:      'Hand-drawn vlog/tutorial annotation style, sketchy arrows, circles, underlines, marker-pen aesthetic, transparent background. ',
+      infographic: 'Infographic style with charts, large numbers, icons, data-viz aesthetic, transparent background. ',
+      comic:       'Comic-book panel illustration, halftone dots, bold ink lines, action burst, transparent background. ',
     };
     const illuStyle = job.questionnaire?.illustrations.style;
-    const styleHint = illuStyle ? STYLE_HINTS[illuStyle] ?? '' : '';
+    const baseHint = 'Illustration with transparent background, no background fill, PNG format. ';
+    const styleHint = illuStyle ? (STYLE_HINTS[illuStyle] ?? baseHint) : baseHint;
 
     // Hard-enforce pt-BR for any text rendered inside the image.
     const ptBRSuffix = ' All visible text, letters, captions, titles, and typography in the image MUST be written in Brazilian Portuguese (pt-BR). Do not include any English words, slogans, or watermarks. If text is shown, it must be in correct, idiomatic Portuguese as spoken in Brazil.';
@@ -109,8 +110,9 @@ export async function POST(request: NextRequest) {
       prompt,
       size: '1024x1024',
       quality: 'medium',
+      background: 'transparent',
       n: 1,
-    });
+    } as Parameters<typeof openai.images.generate>[0]);
 
     const datum = response?.data?.[0];
     if (!datum) {

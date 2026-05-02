@@ -249,7 +249,38 @@ REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
         analysis.scenes = analysis.scenes.map((s) => ({ ...s, imagePrompt: undefined }));
       }
 
-      // (b) If a custom intro title was requested, prepend a TYPED intro scene
+      // (b) Auto-hook: if the user did NOT request a custom intro title, prepend
+      //     a forced 'hook' scene built from analysis.hook (Claude already produces
+      //     it). This guarantees a scroll-stopper in the first ~2.5s — pattern
+      //     interrupt with flash + big text + background shake — even when the
+      //     creator's footage opens slowly. When the user has an intro title, that
+      //     IS their hook (we keep their wording untouched).
+      const hookText = (analysis.hook ?? '').toString().trim();
+      const hasUserIntro = !!(q.introTitle.enabled && q.introTitle.title);
+      const firstSceneIsHook = analysis.scenes[0]?.type === 'hook';
+      if (!hasUserIntro && !firstSceneIsHook && hookText.length >= 5) {
+        const palette = analysis.colorPalette ?? ['#FFD400', '#FF0033', '#1A1A1A'];
+        // Trim very long hooks to a single tight phrase — pro hooks are 3-7 words
+        const trimmedHook = hookText.length > 64
+          ? hookText.split(/[.!?]/)[0].trim().slice(0, 64)
+          : hookText;
+        const hookScene = {
+          id: 'scene-hook',
+          type: 'hook' as const,
+          startLeg: 0,
+          title: trimmedHook,
+          description: 'Gancho automático — interrompe o scroll nos primeiros segundos',
+          sentiment: 'exciting' as const,
+          colorPalette: palette,
+          visualElements: ['flash de impacto', 'texto centralizado', 'shake do fundo'],
+          // 'shake' makes the background video punch in sync with the flash overlay
+          animationType: 'shake',
+          pacing: 'fast',
+        };
+        analysis.scenes = [hookScene, ...analysis.scenes];
+      }
+
+      // (c) If a custom intro title was requested, prepend a TYPED intro scene
       //     using the EXACT user text. Type 'intro' is a dedicated centered overlay
       //     with font + animation chosen by contentType, and auto-contrast text.
       //     The user's text is non-negotiable: we do not let Claude rewrite it.

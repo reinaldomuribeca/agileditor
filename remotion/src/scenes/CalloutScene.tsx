@@ -91,27 +91,10 @@ export default function CalloutScene({ scene, durationFrames }: Props) {
               color: textCol,
               fontFamily: 'Sora, sans-serif',
               lineHeight: 1.1,
-              marginBottom: scene?.description ? 10 : 0,
               wordBreak: 'break-word',
             }}>
               {scene?.title || ''}
             </div>
-            {scene?.description && (
-              <div style={{
-                fontSize: 20,
-                fontWeight: 400,
-                color: textCol,
-                fontFamily: 'Sora, sans-serif',
-                lineHeight: 1.35,
-                opacity: 0.85,
-                display: '-webkit-box',
-                WebkitLineClamp: 2,
-                WebkitBoxOrient: 'vertical' as const,
-                overflow: 'hidden',
-              }}>
-                {scene.description}
-              </div>
-            )}
           </div>
         </div>
       </div>

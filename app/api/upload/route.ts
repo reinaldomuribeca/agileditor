@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
+import { writeFile, mkdir, readdir } from 'fs/promises';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureJobDir, saveJobMetadata } from '@/lib/storage';
@@ -145,8 +145,19 @@ export async function POST(request: NextRequest) {
       console.log(`Job directory created: ${jobDir}`);
 
       const warnings: string[] = [];
-      if (questionnaire.music.enabled) {
-        warnings.push('Trilha sonora solicitada — recurso ainda em desenvolvimento, será aplicado em release futura');
+      if (questionnaire.music.enabled && questionnaire.music.style && questionnaire.music.style !== 'other') {
+        const stylePath = path.join(process.cwd(), 'public', 'music', questionnaire.music.style);
+        try {
+          const files = await readdir(stylePath);
+          const audio = files.filter((f) => /\.(mp3|m4a|aac|wav|ogg|opus)$/i.test(f));
+          if (audio.length === 0) {
+            warnings.push(`Trilha sonora solicitada (estilo: ${questionnaire.music.style}) mas nenhum arquivo encontrado em public/music/${questionnaire.music.style}/. Adicione um MP3 e re-renderize.`);
+          }
+        } catch {
+          warnings.push(`Trilha sonora solicitada (estilo: ${questionnaire.music.style}) mas a pasta public/music/${questionnaire.music.style}/ não existe.`);
+        }
+      } else if (questionnaire.music.enabled && questionnaire.music.style === 'other') {
+        warnings.push('Trilha sonora "outro" não tem biblioteca curada — escolha um dos estilos pré-definidos.');
       }
 
       const userSecret = process.env.USER_SESSION_SECRET;

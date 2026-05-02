@@ -66,8 +66,7 @@ export default function TextOnlyScene({ scene, durationFrames }: Props) {
 
         {scene?.title && (
           <div style={{
-            backgroundColor: 'rgba(0,0,0,0.78)',
-            backdropFilter: 'blur(8px)',
+            backgroundColor: 'rgba(0,0,0,0.85)',
             borderRadius: 20,
             padding: '20px 28px',
             boxShadow: '0 16px 48px rgba(0,0,0,0.5)',

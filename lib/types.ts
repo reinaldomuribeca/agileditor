@@ -1,4 +1,4 @@
-export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'split' | 'intro';
+export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'split' | 'intro' | 'hook';
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'exciting';
 export type JobStatus = 'uploading' | 'merging' | 'normalizing' | 'transcribing' | 'cutting-silence' | 'analyzing' | 'editing' | 'rendering' | 'done' | 'error';
 

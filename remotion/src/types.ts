@@ -30,8 +30,15 @@ export interface SceneData {
   isLightBg?: boolean;
 }
 
+export interface SoundtrackData {
+  src: string;
+  baseVolume: number;
+  duckedVolume: number;
+}
+
 export interface CompositionProps {
   scenes: (SceneData & { startFrame: number; endFrame: number; durationFrames: number })[];
   subtitles: SubtitleData[];
   videoSrc?: string;
+  soundtrack?: SoundtrackData;
 }
