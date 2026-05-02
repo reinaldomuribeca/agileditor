@@ -8,6 +8,7 @@ import SceneList from './SceneList';
 import Timeline from './Timeline';
 import Badge from '@/components/ui/Badge';
 import RenderButton from './RenderButton';
+import EditReport from './EditReport';
 
 interface EditorLayoutProps {
   job: JobMetadata;
@@ -164,7 +165,10 @@ export default function EditorLayout({ job }: EditorLayoutProps) {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-8xl mx-auto px-6 py-8">
+      <div className="max-w-8xl mx-auto px-6 py-8 space-y-6">
+        {/* Delivery report — only after the render is done */}
+        {job.status === 'done' && <EditReport job={job} />}
+
         <div className="grid grid-cols-1 xl:grid-cols-[1fr_400px] gap-6">
           {/* Left Column: Preview + Timeline */}
           <div className="space-y-5">
