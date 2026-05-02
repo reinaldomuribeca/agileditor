@@ -144,7 +144,7 @@ const FAQ = [
 
 export default function LandingPage() {
   return (
-    <main className="min-h-screen bg-app overflow-x-hidden">
+    <main className="min-h-screen bg-app overflow-x-hidden" data-page="sales-landing-v2">
 
       {/* ── Background orbs ── */}
       <div className="fixed inset-0 z-0 pointer-events-none">
