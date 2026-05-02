@@ -2,11 +2,9 @@ import fs from 'fs/promises';
 import path from 'path';
 import type { User, UserPlan, UserStatus, UserLimits } from './types';
 
-const JOBS_DIR = process.env.JOBS_DIR
-  ? path.resolve(process.env.JOBS_DIR)
-  : path.resolve(process.cwd(), 'data', 'jobs');
-
-const USERS_DIR = path.join(path.dirname(JOBS_DIR), 'users');
+const USERS_DIR = process.env.USERS_DIR
+  ? path.resolve(process.env.USERS_DIR)
+  : path.resolve(process.cwd(), 'data', 'users');
 
 const PLAN_DEFAULTS: Record<UserPlan, UserLimits> = {
   free:       { videosPerMonth: 5,   maxVideoDurationSecs: 120,  maxStorageMB: 500 },
