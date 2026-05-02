@@ -24,8 +24,10 @@ import {
 const PUBLIC_EXACT = new Set([
   '/',
   '/login',
+  '/register',
   '/api/login',
   '/api/logout',
+  '/api/register',
   '/api/health',
   '/admin/login',
   '/api/admin/login',
