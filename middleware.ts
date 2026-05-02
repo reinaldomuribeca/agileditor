@@ -23,6 +23,7 @@ import {
 
 const PUBLIC_EXACT = new Set([
   '/',
+  '/home',
   '/login',
   '/register',
   '/api/login',
@@ -46,6 +47,13 @@ function isPublic(path: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
+
+  // Rewrite / → /home so landing page always bypasses the cached root route
+  if (path === '/') {
+    const url = req.nextUrl.clone();
+    url.pathname = '/home';
+    return NextResponse.rewrite(url);
+  }
 
   if (isPublic(path)) return NextResponse.next();
 
