@@ -63,7 +63,7 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG CACHEBUST=1
 RUN echo "build $CACHEBUST"
 
-RUN npm run build
+RUN rm -rf .next && npm run build
 
 # Install Remotion subproject deps + pre-bundle (best-effort)
 RUN cd remotion && npm ci && npm run build 2>/dev/null || true
