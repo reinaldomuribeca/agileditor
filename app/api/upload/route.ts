@@ -4,6 +4,7 @@ import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
 import { ensureJobDir, saveJobMetadata } from '@/lib/storage';
 import { rateLimit, clientIp } from '@/lib/ratelimit';
+import { USER_COOKIE_NAME, verifyUserCookie } from '@/lib/auth';
 import type {
   CutMode,
   CutAggressiveness,
@@ -146,6 +147,14 @@ export async function POST(request: NextRequest) {
         warnings.push('Trilha sonora solicitada — recurso ainda em desenvolvimento, será aplicado em release futura');
       }
 
+      // Associate job with the logged-in user (when user accounts are active)
+      const userSecret = process.env.USER_SESSION_SECRET;
+      let userId: string | undefined;
+      if (userSecret) {
+        const userCookie = request.cookies.get(USER_COOKIE_NAME)?.value;
+        userId = userCookie ? (await verifyUserCookie(userCookie, userSecret).catch(() => null)) ?? undefined : undefined;
+      }
+
       const metadata = {
         id: jobId,
         status: 'normalizing' as const,
@@ -157,6 +166,7 @@ export async function POST(request: NextRequest) {
         cutAggressiveness,
         questionnaire,
         warnings: warnings.length > 0 ? warnings : undefined,
+        userId,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };

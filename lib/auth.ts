@@ -10,8 +10,9 @@
  * handlers) and the Edge runtime (middleware).
  */
 
-export const COOKIE_NAME       = 'agil_session';
-export const ADMIN_COOKIE_NAME = 'agil_admin_session';
+export const COOKIE_NAME       = 'agil_session';       // legacy single-password
+export const ADMIN_COOKIE_NAME = 'agil_admin_session'; // admin panel
+export const USER_COOKIE_NAME  = 'agil_user_session';  // per-user accounts
 export const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 async function hmacHex(payload: string, secret: string): Promise<string> {

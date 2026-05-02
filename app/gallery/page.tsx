@@ -81,7 +81,7 @@ export default function GalleryPage() {
             <span className="text-sm font-semibold text-white">Galeria de Vídeos</span>
           </div>
           <Link
-            href="/"
+            href="/app"
             className="text-xs font-semibold text-gold hover:text-gold/80 transition-colors"
           >
             + Novo vídeo
@@ -116,7 +116,7 @@ export default function GalleryPage() {
               <p className="text-sm text-gray-500 mt-1">Faça upload de um vídeo para começar</p>
             </div>
             <Link
-              href="/"
+              href="/app"
               className="mt-2 inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-gold to-[#FFC933] text-black text-sm font-bold hover:opacity-90 transition-opacity"
             >
               Enviar vídeo
