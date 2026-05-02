@@ -79,6 +79,7 @@ export const dynamic = 'force-dynamic';
 
 const MAX_VIDEO_SIZE_MB = Number(process.env.MAX_VIDEO_SIZE_MB ?? '200');
 const MAX_BYTES = MAX_VIDEO_SIZE_MB * 1024 * 1024;
+const MAX_FILES = 5;
 
 export async function POST(request: NextRequest) {
   try {
@@ -95,17 +96,16 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Reject oversized payloads BEFORE buffering them — based on Content-Length.
+    // Reject obviously oversized payloads before buffering.
     const contentLength = Number(request.headers.get('content-length') ?? '0');
-    if (contentLength > MAX_BYTES) {
+    if (contentLength > MAX_FILES * MAX_BYTES) {
       return NextResponse.json(
-        { error: `Arquivo muito grande. Máximo ${MAX_VIDEO_SIZE_MB} MB.` },
+        { error: `Payload muito grande. Máximo ${MAX_FILES * MAX_VIDEO_SIZE_MB} MB no total.` },
         { status: 413 },
       );
     }
 
     const formData = await request.formData();
-    const file = formData.get('file') as File;
     const prompt = (formData.get('prompt') as string) || '';
     const legendar = (formData.get('legendar') as string) !== 'false';
     const animator = (formData.get('animator') as string) !== 'false';
@@ -117,37 +117,38 @@ export async function POST(request: NextRequest) {
 
     const questionnaire = parseQuestionnaire(formData.get('questionnaire') as string | null);
 
-    if (!file) {
+    // Accept multiple files via `files[]` (new), falling back to legacy `file` (single).
+    const multiFiles = (formData.getAll('files[]') as File[]).filter((f) => f && f.size > 0);
+    const singleFile = formData.get('file') as File | null;
+    const uploadedFiles: File[] = multiFiles.length > 0 ? multiFiles : singleFile ? [singleFile] : [];
+
+    if (uploadedFiles.length === 0) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 });
     }
-    // Second check on actual file size (Content-Length can lie or be absent).
-    if (file.size > MAX_BYTES) {
-      return NextResponse.json(
-        { error: `Arquivo muito grande. Máximo ${MAX_VIDEO_SIZE_MB} MB.` },
-        { status: 413 },
-      );
+    if (uploadedFiles.length > MAX_FILES) {
+      return NextResponse.json({ error: `Máximo de ${MAX_FILES} vídeos por vez.` }, { status: 400 });
+    }
+    for (const f of uploadedFiles) {
+      if (f.size > MAX_BYTES) {
+        return NextResponse.json(
+          { error: `Arquivo "${f.name}" muito grande. Máximo ${MAX_VIDEO_SIZE_MB} MB por vídeo.` },
+          { status: 413 },
+        );
+      }
     }
 
     const jobId = uuidv4();
-    console.log(`Creating job ${jobId}...`);
+    console.log(`Creating job ${jobId} (${uploadedFiles.length} file(s))...`);
 
     try {
       const jobDir = await ensureJobDir(jobId);
       console.log(`Job directory created: ${jobDir}`);
 
-      // Save the video file
-      const bytes = await file.arrayBuffer();
-      const videoPath = path.join(jobDir, 'raw.mp4');
-      await writeFile(videoPath, Buffer.from(bytes));
-      console.log(`Video saved: ${videoPath}`);
-
-      // Save job metadata
       const warnings: string[] = [];
       if (questionnaire.music.enabled) {
         warnings.push('Trilha sonora solicitada — recurso ainda em desenvolvimento, será aplicado em release futura');
       }
 
-      // Associate job with the logged-in user (when user accounts are active)
       const userSecret = process.env.USER_SESSION_SECRET;
       let userId: string | undefined;
       if (userSecret) {
@@ -155,11 +156,36 @@ export async function POST(request: NextRequest) {
         userId = userCookie ? (await verifyUserCookie(userCookie, userSecret).catch(() => null)) ?? undefined : undefined;
       }
 
+      let videoPath: string | undefined;
+      let rawPaths: string[] | undefined;
+      let status: 'normalizing' | 'merging';
+
+      if (uploadedFiles.length === 1) {
+        // Single video — save directly as raw.mp4 and skip merge step.
+        const bytes = await uploadedFiles[0].arrayBuffer();
+        videoPath = path.join(jobDir, 'raw.mp4');
+        await writeFile(videoPath, Buffer.from(bytes));
+        status = 'normalizing';
+        console.log(`Video saved: ${videoPath}`);
+      } else {
+        // Multiple videos — save each as raw-N.mp4 and set status to merging.
+        rawPaths = [];
+        for (let i = 0; i < uploadedFiles.length; i++) {
+          const bytes = await uploadedFiles[i].arrayBuffer();
+          const p = path.join(jobDir, `raw-${i}.mp4`);
+          await writeFile(p, Buffer.from(bytes));
+          rawPaths.push(p);
+          console.log(`Video ${i + 1}/${uploadedFiles.length} saved: ${p}`);
+        }
+        status = 'merging';
+      }
+
       const metadata = {
         id: jobId,
-        status: 'normalizing' as const,
+        status,
         prompt: prompt || questionnaire.notes || undefined,
         videoPath,
+        rawPaths,
         legendar,
         animator,
         cutMode,
@@ -181,18 +207,13 @@ export async function POST(request: NextRequest) {
       });
     } catch (storageError) {
       console.error('Storage error:', storageError);
-      throw new Error(
-        `Failed to save job: ${(storageError as Error).message}`
-      );
+      throw new Error(`Failed to save job: ${(storageError as Error).message}`);
     }
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json(
-      {
-        error: 'Upload failed',
-        details: (error as Error).message,
-      },
-      { status: 500 }
+      { error: 'Upload failed', details: (error as Error).message },
+      { status: 500 },
     );
   }
 }

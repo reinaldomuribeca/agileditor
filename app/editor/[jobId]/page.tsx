@@ -7,7 +7,7 @@ import EditorLayout from '@/components/editor/EditorLayout';
 
 /* ─── Pipeline definition ─────────────────────────────────────────────── */
 
-const STEPS = [
+const BASE_STEPS = [
   { id: 'uploading',        label: 'Upload',           desc: 'Enviando vídeo para o servidor' },
   { id: 'normalizing',      label: 'Normalizar',       desc: 'Convertendo para H.264 · 30 fps' },
   { id: 'transcribing',     label: 'Transcrever',      desc: 'Extraindo fala e timestamps do áudio' },
@@ -16,19 +16,14 @@ const STEPS = [
   { id: 'rendering',        label: 'Renderizar',       desc: 'Gerando o vídeo final 9:16 em alta qualidade' },
 ] as const;
 
-type StepId = (typeof STEPS)[number]['id'];
+const MERGE_STEP = {
+  id: 'merging',
+  label: 'Unindo vídeos',
+  desc: 'Concatenando as gravações em um único vídeo',
+} as const;
 
-const STATUS_IDX: Record<string, number> = {
-  uploading:        0,
-  normalizing:      1,
-  transcribing:     2,
-  'cutting-silence':3,
-  analyzing:        4,
-  editing:          5,
-  rendering:        5,
-  done:             6,
-  error:           -1,
-};
+// Steps are computed per-job inside the component to optionally include the merge step.
+type StepId = (typeof BASE_STEPS)[number]['id'] | 'merging';
 
 /* ─── Progress bar with ref (avoids inline style) ─────────────────────── */
 
@@ -73,6 +68,12 @@ function StepIcon({ id, className }: { id: StepId | string; className?: string }
       return (
         <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14.121 14.121L19 19m-7-7l7-7m-7 7l-2.879 2.879M12 12L9.121 9.121m0 5.758a3 3 0 10-4.243 4.243 3 3 0 004.243-4.243zm0-5.758a3 3 0 10-4.243-4.243 3 3 0 004.243 4.243z" />
+        </svg>
+      );
+    case 'merging':
+      return (
+        <svg className={cls} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 6h6m0 0v12m0-12l6 6m-6 6l6-6M20 18h-6" />
         </svg>
       );
     case 'analyzing':
@@ -120,6 +121,7 @@ export default function EditorPage({ params }: { params: { jobId: string } }) {
     if (!job) return;
 
     const PIPELINE: Partial<Record<string, string>> = {
+      merging:           '/api/merge',
       normalizing:       '/api/normalize',
       transcribing:      '/api/transcribe',
       'cutting-silence': '/api/cut-silence',
@@ -267,6 +269,16 @@ export default function EditorPage({ params }: { params: { jobId: string } }) {
   }
 
   /* ── Processing screen ── */
+
+  // Insert merge step only when this job was created from multiple videos.
+  const isMultiVideo = !!(job.rawPaths && job.rawPaths.length > 1);
+  const STEPS = isMultiVideo
+    ? [BASE_STEPS[0], MERGE_STEP, ...BASE_STEPS.slice(1)]
+    : [...BASE_STEPS];
+
+  const STATUS_IDX: Record<string, number> = isMultiVideo
+    ? { uploading: 0, merging: 1, normalizing: 2, transcribing: 3, 'cutting-silence': 4, analyzing: 5, editing: 6, rendering: 6, done: 7, error: -1 }
+    : { uploading: 0, normalizing: 1, transcribing: 2, 'cutting-silence': 3, analyzing: 4, editing: 5, rendering: 5, done: 6, error: -1 };
 
   const isError = job.status === 'error';
   const currentIdx = isError ? -1 : (STATUS_IDX[job.status] ?? 0);

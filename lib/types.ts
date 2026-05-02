@@ -1,6 +1,6 @@
 export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'split' | 'intro';
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'exciting';
-export type JobStatus = 'uploading' | 'normalizing' | 'transcribing' | 'cutting-silence' | 'analyzing' | 'editing' | 'rendering' | 'done' | 'error';
+export type JobStatus = 'uploading' | 'merging' | 'normalizing' | 'transcribing' | 'cutting-silence' | 'analyzing' | 'editing' | 'rendering' | 'done' | 'error';
 
 /**
  * Cut mode — how the video should be trimmed during the cut-silence step.
@@ -140,6 +140,8 @@ export interface JobMetadata {
   warnings?: string[];
   /** Average luminance of the first frame (0-255). Used for intro title auto-contrast. */
   firstFrameLuminance?: number;
+  /** Paths to raw uploaded files when multiple videos are merged (multi-video jobs only). */
+  rawPaths?: string[];
   /** Which user submitted this job. Undefined on legacy jobs created before user accounts. */
   userId?: string;
   /** API usage recorded during this job's pipeline steps. */

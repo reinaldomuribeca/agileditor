@@ -10,6 +10,14 @@ export interface UploadZoneProps {
   onSuccess: (jobId: string) => void;
 }
 
+const MAX_FILES = 5;
+const MAX_FILE_MB = Number(process.env.NEXT_PUBLIC_MAX_VIDEO_SIZE_MB ?? '200');
+
+function formatSize(bytes: number): string {
+  if (bytes >= 1_048_576) return `${(bytes / 1_048_576).toFixed(1)} MB`;
+  return `${(bytes / 1_024).toFixed(0)} KB`;
+}
+
 function formatSpeed(bps: number): string {
   if (bps >= 1_048_576) return `${(bps / 1_048_576).toFixed(1)} MB/s`;
   if (bps >= 1_024) return `${(bps / 1_024).toFixed(0)} KB/s`;
@@ -164,7 +172,7 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
   const [state, setState] = useState<State>('idle');
   const [isDragActive, setIsDragActive] = useState(false);
-  const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
   const [loaded, setLoaded] = useState(0);
   const [speed, setSpeed] = useState(0);
   const [error, setError] = useState<string | null>(null);
@@ -172,23 +180,56 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
   const [cutAggressiveness, setCutAggressiveness] = useState<CutAggressiveness>('balanced');
   const [questionnaire, setQuestionnaire] = useState<Questionnaire>(DEFAULT_QUESTIONNAIRE);
 
-  const pct = file ? Math.min(100, Math.round((loaded / file.size) * 100)) : 0;
+  const totalSize = files.reduce((s, f) => s + f.size, 0);
+  const pct = totalSize > 0 ? Math.min(100, Math.round((loaded / totalSize) * 100)) : 0;
 
-  const pickFile = (f: File) => {
-    if (!f.type.startsWith('video/')) {
-      setError('Selecione um arquivo de vídeo (MP4, MOV, WebM)');
+  const addFiles = (incoming: FileList | File[]) => {
+    const candidates = Array.from(incoming);
+    const invalid = candidates.filter((f) => !f.type.startsWith('video/'));
+    if (invalid.length > 0) {
+      setError('Selecione apenas arquivos de vídeo (MP4, MOV, WebM)');
       return;
     }
-    setError(null);
-    setFile(f);
+    const oversized = candidates.filter((f) => f.size > MAX_FILE_MB * 1_048_576);
+    if (oversized.length > 0) {
+      setError(`Arquivo muito grande. Máximo ${MAX_FILE_MB} MB por vídeo.`);
+      return;
+    }
+    setFiles((prev) => {
+      const combined = [...prev, ...candidates];
+      if (combined.length > MAX_FILES) {
+        setError(`Máximo de ${MAX_FILES} vídeos por vez.`);
+        return prev.slice(0, MAX_FILES);
+      }
+      setError(null);
+      return combined;
+    });
     setState('selected');
+  };
+
+  const removeFile = (index: number) => {
+    setFiles((prev) => {
+      const next = prev.filter((_, i) => i !== index);
+      if (next.length === 0) setState('idle');
+      return next;
+    });
+  };
+
+  const moveFile = (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    setFiles((prev) => {
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[target]] = [next[target], next[index]];
+      return next;
+    });
   };
 
   const reset = () => {
     xhrRef.current?.abort();
     xhrRef.current = null;
     setState('idle');
-    setFile(null);
+    setFiles([]);
     setLoaded(0);
     setSpeed(0);
     setError(null);
@@ -206,13 +247,13 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
     e.preventDefault();
     e.stopPropagation();
     setIsDragActive(false);
-    const dropped = e.dataTransfer.files?.[0];
-    if (dropped) pickFile(dropped);
+    if (state === 'uploading') return;
+    if (e.dataTransfer.files.length > 0) addFiles(e.dataTransfer.files);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!file || state === 'uploading') return;
+    if (files.length === 0 || state === 'uploading') return;
 
     setState('uploading');
     setLoaded(0);
@@ -220,11 +261,10 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
     setError(null);
 
     const formData = new FormData();
-    formData.append('file', file);
+    files.forEach((f) => formData.append('files[]', f));
     formData.append('cutMode', cutMode);
     formData.append('cutAggressiveness', cutAggressiveness);
     formData.append('questionnaire', JSON.stringify(questionnaire));
-    // Backwards compat: still send notes as `prompt`, and derive legendar/animator
     formData.append('prompt', questionnaire.notes ?? '');
     formData.append('legendar', String(questionnaire.subtitles !== 'none'));
     formData.append('animator', String(questionnaire.illustrations.enabled));
@@ -274,6 +314,7 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
   return (
     <form onSubmit={handleSubmit} className="w-full space-y-4">
+      {/* ── Uploading state ── */}
       {state === 'uploading' ? (
         <div className="rounded-2xl border border-gold/30 bg-gold/[0.03] p-6 space-y-5">
           <div className="flex items-center gap-3">
@@ -283,8 +324,10 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
               </svg>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-white truncate">{file?.name}</p>
-              <p className="text-xs text-gray-500">{file ? `${(file.size / 1_048_576).toFixed(1)} MB total` : ''}</p>
+              <p className="text-sm font-semibold text-white truncate">
+                {files.length === 1 ? files[0].name : `${files.length} vídeos selecionados`}
+              </p>
+              <p className="text-xs text-gray-500">{formatSize(totalSize)} no total</p>
             </div>
             <button type="button" onClick={reset} className="text-xs text-gray-600 hover:text-gray-400 transition-colors flex-shrink-0">
               Cancelar
@@ -293,7 +336,9 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
 
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400 font-medium">Taxa de upload</span>
+              <span className="text-xs text-gray-400 font-medium">
+                {files.length > 1 ? 'Enviando vídeos...' : 'Taxa de upload'}
+              </span>
               <span className="text-sm font-bold text-gold tabular-nums">{pct}%</span>
             </div>
             <div className="h-3 rounded-full bg-surface-2 overflow-hidden">
@@ -304,22 +349,23 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
             </div>
             <div className="flex items-center justify-between text-xs text-gray-600">
               <span className="tabular-nums font-medium">{speed > 0 ? formatSpeed(speed) : '—'}</span>
-              <span className="tabular-nums">{file ? formatEta(file.size - loaded, speed) : ''}</span>
+              <span className="tabular-nums">{formatEta(totalSize - loaded, speed)}</span>
             </div>
           </div>
 
           <div className="flex items-center justify-between text-[11px] text-gray-700 tabular-nums border-t border-border-dim pt-3">
-            <span>{(loaded / 1_048_576).toFixed(2)} MB enviados</span>
-            <span>{file ? `de ${(file.size / 1_048_576).toFixed(2)} MB` : ''}</span>
+            <span>{formatSize(loaded)} enviados</span>
+            <span>de {formatSize(totalSize)}</span>
           </div>
         </div>
       ) : (
+        /* ── Idle / Selected state ── */
         <div
           className={`relative rounded-2xl border-2 border-dashed transition-all duration-300 ${
             isDragActive
               ? 'border-gold bg-gold/5 scale-[1.01]'
               : state === 'selected'
-              ? 'border-gold/40 bg-gold/[0.03]'
+              ? 'border-gold/40 bg-gold/[0.02]'
               : 'border-border-mid hover:border-gold/40 bg-surface-1 cursor-pointer'
           }`}
           onDragEnter={handleDrag}
@@ -332,16 +378,18 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
             ref={inputRef}
             type="file"
             accept="video/*"
-            aria-label="Selecionar arquivo de vídeo"
-            title="Selecionar arquivo de vídeo"
+            multiple
+            aria-label="Selecionar arquivos de vídeo"
+            title="Selecionar arquivos de vídeo"
             className="hidden"
             onChange={(e) => {
-              const f = e.target.files?.[0];
-              if (f) pickFile(f);
+              if (e.target.files && e.target.files.length > 0) addFiles(e.target.files);
+              e.target.value = '';
             }}
           />
 
           {state === 'idle' ? (
+            /* ── Drop zone (no files yet) ── */
             <div className="px-8 py-14 text-center space-y-4">
               <div className={`mx-auto w-14 h-14 rounded-2xl border flex items-center justify-center transition-all duration-300 ${isDragActive ? 'bg-gold/20 border-gold/40' : 'bg-surface-2 border-border-mid'}`}>
                 <svg className={`w-7 h-7 transition-colors duration-300 ${isDragActive ? 'text-gold' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -352,7 +400,7 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
                 <h3 className={`text-base font-bold transition-colors duration-300 ${isDragActive ? 'text-gold' : 'text-white'}`}>
                   {isDragActive ? 'Solte para enviar' : 'Arraste seu vídeo aqui'}
                 </h3>
-                <p className="text-sm text-gray-500 mt-1">MP4, MOV ou WebM — até 500 MB</p>
+                <p className="text-sm text-gray-500 mt-1">MP4, MOV ou WebM · até {MAX_FILE_MB} MB · até {MAX_FILES} vídeos</p>
               </div>
               <div className="flex items-center justify-center gap-3 text-xs text-gray-600">
                 <span className="h-px w-10 bg-border-dim" />
@@ -361,26 +409,86 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
               </div>
             </div>
           ) : (
-            <div className="p-5 flex items-center gap-4">
-              <div className="w-12 h-12 rounded-xl bg-gold/10 border border-gold/20 flex items-center justify-center flex-shrink-0">
-                <svg className="w-6 h-6 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-white font-semibold truncate text-sm">{file!.name}</p>
-                <p className="text-xs text-gray-500 mt-0.5">{(file!.size / 1_048_576).toFixed(1)} MB</p>
-              </div>
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); reset(); }}
-                className="flex-shrink-0 w-8 h-8 flex items-center justify-center text-gray-500 hover:text-red-400 transition-colors rounded-lg hover:bg-red-500/10"
-                aria-label="Remover arquivo"
-              >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
+            /* ── File list ── */
+            <div className="p-3 space-y-2">
+              {files.map((f, i) => (
+                <div key={`${f.name}-${i}`} className="flex items-center gap-2 bg-surface-2 rounded-xl px-3 py-2.5">
+                  {/* Order badge */}
+                  <span className="w-5 h-5 flex-shrink-0 rounded-full bg-gold/20 text-gold text-[10px] font-bold flex items-center justify-center">
+                    {i + 1}
+                  </span>
+
+                  {/* Video icon */}
+                  <svg className="w-4 h-4 text-gold flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 10l4.553-2.069A1 1 0 0121 8.82v6.36a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                  </svg>
+
+                  {/* Name + size */}
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold text-white truncate">{f.name}</p>
+                    <p className="text-[10px] text-gray-500">{formatSize(f.size)}</p>
+                  </div>
+
+                  {/* Reorder buttons */}
+                  <div className="flex flex-col gap-0.5 flex-shrink-0">
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); moveFile(i, -1); }}
+                      disabled={i === 0}
+                      aria-label="Mover para cima"
+                      className="w-5 h-4 flex items-center justify-center text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={(e) => { e.stopPropagation(); moveFile(i, 1); }}
+                      disabled={i === files.length - 1}
+                      aria-label="Mover para baixo"
+                      className="w-5 h-4 flex items-center justify-center text-gray-600 hover:text-gray-300 disabled:opacity-20 disabled:cursor-not-allowed transition-colors"
+                    >
+                      <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+                  </div>
+
+                  {/* Remove button */}
+                  <button
+                    type="button"
+                    onClick={(e) => { e.stopPropagation(); removeFile(i); }}
+                    aria-label="Remover vídeo"
+                    className="w-7 h-7 flex-shrink-0 flex items-center justify-center text-gray-500 hover:text-red-400 hover:bg-red-500/10 rounded-lg transition-colors"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+
+              {/* Add more button (shown when under the limit) */}
+              {files.length < MAX_FILES && (
+                <button
+                  type="button"
+                  onClick={(e) => { e.stopPropagation(); inputRef.current?.click(); }}
+                  className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed border-border-mid text-gray-500 hover:border-gold/40 hover:text-gray-300 transition-all duration-200 text-xs"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                  Adicionar vídeo ({files.length}/{MAX_FILES})
+                </button>
+              )}
+
+              {/* Total size summary when multiple files */}
+              {files.length > 1 && (
+                <p className="text-[10px] text-gray-600 text-right pr-1">
+                  Total: {formatSize(totalSize)} · {files.length} vídeos serão unidos
+                </p>
+              )}
             </div>
           )}
         </div>
@@ -413,7 +521,7 @@ export default function UploadZone({ onSuccess }: UploadZoneProps) {
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-700 pointer-events-none" />
             <span className="relative flex items-center justify-center gap-2 text-sm">
-              Processar vídeo
+              {files.length > 1 ? `Unir e processar ${files.length} vídeos` : 'Processar vídeo'}
             </span>
           </button>
         </>
