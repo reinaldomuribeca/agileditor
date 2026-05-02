@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { signAdminCookie, ADMIN_COOKIE_NAME, COOKIE_MAX_AGE_SECONDS } from '@/lib/auth';
+import { redirectUrl } from '@/lib/utils';
 
 export const runtime = 'nodejs';
 
@@ -10,20 +11,19 @@ export async function POST(request: NextRequest) {
 
   const adminPassword = process.env.ADMIN_PASSWORD;
   if (!adminPassword) {
-    // Dev mode: no password required
-    const res = NextResponse.redirect(new URL(next, request.url));
-    return res;
+    return NextResponse.redirect(redirectUrl('/admin', request), { status: 303 });
   }
 
   if (!password || password !== adminPassword) {
-    const url = new URL('/admin/login', request.url);
+    const url = redirectUrl('/admin/login', request);
     url.searchParams.set('error', '1');
     url.searchParams.set('next', next);
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(url, { status: 303 });
   }
 
   const cookieValue = await signAdminCookie(adminPassword);
-  const res = NextResponse.redirect(new URL(next, request.url));
+  const safeNext = next.startsWith('/') && !next.startsWith('//') ? next : '/admin';
+  const res = NextResponse.redirect(redirectUrl(safeNext, request), { status: 303 });
   res.cookies.set(ADMIN_COOKIE_NAME, cookieValue, {
     httpOnly: true,
     sameSite: 'lax',
