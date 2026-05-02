@@ -30,6 +30,7 @@ const PUBLIC_EXACT = new Set([
   '/api/register',
   '/api/health',
   '/api/version',
+  '/api/bust',
   '/admin/login',
   '/api/admin/login',
   '/api/admin/logout',
