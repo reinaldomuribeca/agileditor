@@ -57,17 +57,19 @@ export async function POST(request: NextRequest) {
     const propsFile = await getJobFilePath(jobId, 'render-props.json');
 
     // Serve the video via HTTP so Remotion's Chromium can load it (file:// is blocked).
-    // Remotion's headless Chromium does NOT use this Next.js server as its origin, so any
-    // relative URL inside scene props would resolve against Remotion's own origin (typically
-    // localhost:3000) and 404. We absolutize anything that starts with '/' here.
-    const appUrl  = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3333';
+    // IMPORTANT: Remotion's headless Chromium runs inside the same container/host as this
+    // server. It CANNOT reach the public domain (NEXT_PUBLIC_APP_URL) because containers
+    // typically cannot route to themselves via their own external hostname. Always use an
+    // internal loopback URL here. Override with RENDER_INTERNAL_URL if the port differs.
+    const port = process.env.PORT || '3333';
+    const internalUrl = process.env.RENDER_INTERNAL_URL || `http://localhost:${port}`;
     const videoFile = useCut ? 'cut.mp4' : 'normalized.mp4';
-    const videoSrc = `${appUrl}/api/video/${jobId}/${videoFile}`;
-    console.log(`[render] using ${videoFile} (timeline=${useCut ? 'cut' : 'raw'}) appUrl=${appUrl}`);
+    const videoSrc = `${internalUrl}/api/video/${jobId}/${videoFile}`;
+    console.log(`[render] using ${videoFile} (timeline=${useCut ? 'cut' : 'raw'}) internalUrl=${internalUrl}`);
 
     const scenesAbs = scenesWithFrames.map((s) => ({
       ...s,
-      imageUrl: s.imageUrl?.startsWith('/') ? `${appUrl}${s.imageUrl}` : s.imageUrl,
+      imageUrl: s.imageUrl?.startsWith('/') ? `${internalUrl}${s.imageUrl}` : s.imageUrl,
     }));
 
     await fs.writeFile(propsFile, JSON.stringify({
