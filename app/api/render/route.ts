@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     // server. It CANNOT reach the public domain (NEXT_PUBLIC_APP_URL) because containers
     // typically cannot route to themselves via their own external hostname. Always use an
     // internal loopback URL here. Override with RENDER_INTERNAL_URL if the port differs.
-    const port = process.env.PORT || '3333';
+    const port = process.env.PORT || '3000';
     const internalUrl = process.env.RENDER_INTERNAL_URL || `http://localhost:${port}`;
     const videoFile = useCut ? 'cut.mp4' : 'normalized.mp4';
     const videoSrc = `${internalUrl}/api/video/${jobId}/${videoFile}`;

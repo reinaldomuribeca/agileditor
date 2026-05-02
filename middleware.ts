@@ -37,7 +37,7 @@ const PUBLIC_EXACT = new Set([
   '/api/admin/logout',
 ]);
 
-const PUBLIC_PREFIX = ['/favicon', '/_next'];
+const PUBLIC_PREFIX = ['/favicon', '/_next', '/api/video/'];
 
 function isPublic(path: string): boolean {
   if (PUBLIC_EXACT.has(path)) return true;
