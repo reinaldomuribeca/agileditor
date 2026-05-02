@@ -22,6 +22,7 @@ import {
  */
 
 const PUBLIC_EXACT = new Set([
+  '/',
   '/login',
   '/register',
   '/api/login',
@@ -43,37 +44,6 @@ function isPublic(path: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const path = req.nextUrl.pathname;
-
-  // Landing page: redirect already-authenticated users straight to /app.
-  if (path === '/') {
-    const userSecret    = process.env.USER_SESSION_SECRET;
-    const appPassword   = process.env.APP_PASSWORD;
-    const adminPassword = process.env.ADMIN_PASSWORD;
-
-    if (userSecret || appPassword || adminPassword) {
-      let authed = false;
-
-      if (adminPassword) {
-        const c = req.cookies.get(ADMIN_COOKIE_NAME)?.value;
-        if (c) authed = await verifyAdminCookie(c, adminPassword).catch(() => false);
-      }
-      if (!authed && userSecret) {
-        const c = req.cookies.get(USER_COOKIE_NAME)?.value;
-        if (c) authed = !!(await verifyUserCookie(c, userSecret).catch(() => null));
-      }
-      if (!authed && appPassword) {
-        const c = req.cookies.get(COOKIE_NAME)?.value;
-        if (c) authed = await verifyCookie(c, appPassword).catch(() => false);
-      }
-
-      if (authed) {
-        const url = req.nextUrl.clone();
-        url.pathname = '/app';
-        return NextResponse.redirect(url);
-      }
-    }
-    return NextResponse.next();
-  }
 
   if (isPublic(path)) return NextResponse.next();
 
