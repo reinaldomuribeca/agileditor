@@ -2,8 +2,14 @@ import fs from 'fs/promises';
 import path from 'path';
 import type { User, UserPlan, UserStatus, UserLimits } from './types';
 
+// When JOBS_DIR is explicitly set (production/Docker), store users as a sibling
+// of that directory so they land in the same writable location.
+// Fallback: data/users alongside data/jobs for local dev (cwd-relative).
+const _jobsDirEnv = process.env.JOBS_DIR;
 const USERS_DIR = process.env.USERS_DIR
   ? path.resolve(process.env.USERS_DIR)
+  : _jobsDirEnv
+  ? path.join(path.dirname(path.resolve(_jobsDirEnv)), 'agil-editor-users')
   : path.resolve(process.cwd(), 'data', 'users');
 
 const PLAN_DEFAULTS: Record<UserPlan, UserLimits> = {
