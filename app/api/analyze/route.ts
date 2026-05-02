@@ -249,28 +249,31 @@ REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
         analysis.scenes = analysis.scenes.map((s) => ({ ...s, imagePrompt: undefined }));
       }
 
-      // (b) If a custom intro title was requested, prepend a forced cover scene
-      //     using the EXACT user text. This is non-negotiable: the user typed it.
+      // (b) If a custom intro title was requested, prepend a TYPED intro scene
+      //     using the EXACT user text. Type 'intro' is a dedicated centered overlay
+      //     with font + animation chosen by contentType, and auto-contrast text.
+      //     The user's text is non-negotiable: we do not let Claude rewrite it.
       if (q.introTitle.enabled && q.introTitle.title) {
-        const accent = analysis.accentColor ?? '#FFB800';
         const palette = analysis.colorPalette ?? ['#FFB800', '#FF0033', '#1A1A1A'];
+        const isLightBg = typeof job.firstFrameLuminance === 'number' && job.firstFrameLuminance >= 128;
         const introScene = {
           id: 'scene-intro',
-          type: 'cover' as const,
+          type: 'intro' as const,
           startLeg: 0,
           title: q.introTitle.title,
+          subtitle: q.introTitle.subtitle,
           description: q.introTitle.subtitle ?? 'Título de abertura definido pelo usuário',
           sentiment: 'exciting' as const,
           colorPalette: palette,
-          visualElements: ['título centralizado', 'tipografia impactante', 'flash de luz'],
-          imagePrompt: q.illustrations.enabled
-            ? `Bold viral title card: massive uppercase typography that reads "${q.introTitle.title}" in Brazilian Portuguese${q.introTitle.subtitle ? ` with subtitle "${q.introTitle.subtitle}" below` : ''}, neon ${accent} accent, dark background, high contrast, mobile 9:16 format, TikTok style. All visible text in pt-BR.`
-            : undefined,
-          animationType: 'zoom_in',
+          visualElements: ['título centralizado', 'tipografia personalizada', 'auto-contraste'],
+          contentType: q.contentType,
+          isLightBg,
+          // No imagePrompt — the intro is text only; user typed the words themselves.
+          animationType: 'none',
           pacing: 'fast',
         };
-        // Push existing scenes' startLeg untouched — the intro will render
-        // for ~2-3s before the first transcript-aligned scene starts.
+        // Existing scenes' startLeg untouched. The render route will force the
+        // intro scene's durationFrames to ~90 (3s @ 30fps) regardless of leg math.
         analysis.scenes = [introScene, ...analysis.scenes];
       }
     }

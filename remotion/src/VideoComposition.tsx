@@ -6,6 +6,7 @@ import TextOnlyScene from './scenes/TextOnlyScene';
 import CalloutScene from './scenes/CalloutScene';
 import SplitScene from './scenes/SplitScene';
 import CoverScene from './scenes/CoverScene';
+import IntroScene from './scenes/IntroScene';
 import SubtitleOverlay from './components/SubtitleOverlay';
 
 export interface SceneWithFrames extends SceneData {
@@ -94,6 +95,7 @@ function VideoWithEffects({ scenes, videoSrc }: { scenes: SceneWithFrames[]; vid
 
 function SceneOverlay({ scene, durationFrames }: { scene: SceneData; durationFrames: number }) {
   switch (scene.type) {
+    case 'intro':        return <IntroScene scene={scene} durationFrames={durationFrames} />;
     case 'talking_head': return <TalkingHeadScene scene={scene} durationFrames={durationFrames} />;
     case 'text_only':    return <TextOnlyScene scene={scene} durationFrames={durationFrames} />;
     case 'callout':      return <CalloutScene scene={scene} durationFrames={durationFrames} />;

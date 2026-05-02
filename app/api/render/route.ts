@@ -33,11 +33,24 @@ export async function POST(request: NextRequest) {
     }
 
     // Convert scenes from subtitle index to frame numbers (against the same timeline)
-    const scenesWithFrames = convertScenesFromLegendaIndex(job.analysis.scenes, effectiveSubs);
+    const rawScenesWithFrames = convertScenesFromLegendaIndex(job.analysis.scenes, effectiveSubs);
 
-    if (scenesWithFrames.length === 0) {
+    if (rawScenesWithFrames.length === 0) {
       return NextResponse.json({ error: 'No scenes to render' }, { status: 400 });
     }
+
+    // Special case: the user-defined intro title (type='intro') gets a fixed 3s
+    // overlay window regardless of subtitle timing. It overlaps with whatever
+    // scene starts after — that's fine: intro is a centered text overlay, the
+    // next scene is corner-positioned, they compose without visual conflict.
+    const INTRO_DURATION_FRAMES = 90; // 3s @ 30fps
+    const scenesWithFrames = rawScenesWithFrames.map((s) => {
+      if (s.type === 'intro') {
+        const newEnd = s.startFrame + INTRO_DURATION_FRAMES;
+        return { ...s, endFrame: newEnd, durationFrames: INTRO_DURATION_FRAMES };
+      }
+      return s;
+    });
 
     // Prepare paths
     const outputPath = await getJobFilePath(jobId, 'output.mp4');

@@ -64,6 +64,40 @@ function normalizeVideo(inputPath: string, outputPath: string): Promise<void> {
 }
 
 /**
+ * Compute average luminance (0-255) of the FIRST frame by extracting it as a
+ * 1×1 grayscale pixel. Output is one byte that equals the frame's avg Y.
+ *
+ * Used downstream to pick light vs dark text color for the intro title overlay.
+ */
+function getFirstFrameLuminance(filePath: string): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const args = [
+      '-y',
+      '-ss', '0',
+      '-i', filePath,
+      '-vframes', '1',
+      '-vf', 'scale=1:1',
+      '-pix_fmt', 'gray',
+      '-f', 'rawvideo',
+      'pipe:1',
+    ];
+    const proc = spawn(FFMPEG_BIN, args, { stdio: ['ignore', 'pipe', 'pipe'] });
+    const chunks: Buffer[] = [];
+    let stderr = '';
+    proc.stdout.on('data', (c: Buffer) => chunks.push(c));
+    proc.stderr.on('data', (c: Buffer) => { stderr += c.toString(); });
+    proc.on('error', reject);
+    proc.on('close', (code) => {
+      if (code !== 0) return reject(new Error(`luminance ffmpeg failed (${code}): ${stderr.slice(-200)}`));
+      const buf = Buffer.concat(chunks);
+      if (buf.length === 0) return reject(new Error('luminance: empty pipe'));
+      // First byte is the 1×1 grayscale pixel — the average Y of the frame.
+      resolve(buf[0]);
+    });
+  });
+}
+
+/**
  * Get video duration by parsing ffmpeg -i stderr output.
  * Avoids ffprobe (not bundled with @ffmpeg-installer).
  */
@@ -152,6 +186,16 @@ export async function POST(request: NextRequest) {
     const duration = await getVideoDuration(normalizedPath);
     console.log(`[normalize] duration: ${duration.toFixed(2)}s`);
 
+    // First-frame luminance — used by intro title scene for auto-contrast.
+    // Best-effort: failure here is non-fatal (we'll just skip the override later).
+    let firstFrameLuminance: number | undefined;
+    try {
+      firstFrameLuminance = await getFirstFrameLuminance(normalizedPath);
+      console.log(`[normalize] first-frame luminance: ${firstFrameLuminance}/255 (${firstFrameLuminance >= 128 ? 'light' : 'dark'})`);
+    } catch (err) {
+      console.warn('[normalize] luminance probe failed (non-fatal):', (err as Error).message);
+    }
+
     // Hard cap on duration. Whisper has a 24MB audio limit (~50 min @ 64kbps mono),
     // and Claude tokens scale with transcript length. Default 600s = 10min keeps
     // both bounded. Override with MAX_VIDEO_DURATION_SECONDS.
@@ -166,6 +210,7 @@ export async function POST(request: NextRequest) {
       status: 'transcribing',
       normalizedPath,
       duration: Math.round(duration),
+      firstFrameLuminance,
     });
 
     const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);

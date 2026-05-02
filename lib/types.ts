@@ -1,4 +1,4 @@
-export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'split';
+export type SceneType = 'cover' | 'talking_head' | 'text_only' | 'callout' | 'split' | 'intro';
 export type Sentiment = 'positive' | 'neutral' | 'negative' | 'exciting';
 export type JobStatus = 'uploading' | 'normalizing' | 'transcribing' | 'cutting-silence' | 'analyzing' | 'editing' | 'rendering' | 'done' | 'error';
 
@@ -84,6 +84,12 @@ export interface SceneInput {
   visualElements: string[];
   animationType?: string;
   pacing?: string;
+  /** For type='intro' only: subtitle text shown below the title. */
+  subtitle?: string;
+  /** For type='intro' only: which font/animation preset to use (mirrors questionnaire.contentType). */
+  contentType?: ContentType;
+  /** For type='intro' only: pre-computed flag — true when first frame of source is light. */
+  isLightBg?: boolean;
 }
 
 export interface SceneWithFrames extends SceneInput {
@@ -132,6 +138,8 @@ export interface JobMetadata {
   questionnaire?: Questionnaire;
   /** Soft warnings the pipeline produced (e.g. detected hallucination, fallback applied). */
   warnings?: string[];
+  /** Average luminance of the first frame (0-255). Used for intro title auto-contrast. */
+  firstFrameLuminance?: number;
 }
 
 export interface PipelineStep {

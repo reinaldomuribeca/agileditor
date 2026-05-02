@@ -25,6 +25,9 @@ export interface SceneData {
   imageUrl?: string;
   animationType?: string;
   pacing?: string;
+  subtitle?: string;
+  contentType?: string;
+  isLightBg?: boolean;
 }
 
 export interface CompositionProps {
