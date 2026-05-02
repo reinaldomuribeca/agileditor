@@ -1,7 +1,6 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
 import Link from 'next/link';
 import UploadZone from '@/components/upload/UploadZone';
 
@@ -49,43 +48,22 @@ export default function AppHome() {
 
         {/* Hero */}
         <section className="flex-1 flex flex-col items-center justify-center px-4 py-8 text-center">
-          <motion.h1
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.08 }}
-            className="text-[clamp(2.4rem,7vw,5rem)] font-black tracking-[-0.04em] leading-[0.9] mb-4 max-w-2xl"
-          >
+          <h1 className="text-[clamp(2.4rem,7vw,5rem)] font-black tracking-[-0.04em] leading-[0.9] mb-4 max-w-2xl animate-slide-up anim-fill-both">
             <span className="block text-white">Envie seu vídeo</span>
             <span className="block gradient-text">e a IA edita.</span>
-          </motion.h1>
+          </h1>
 
-          <motion.p
-            initial={{ opacity: 0, y: 16 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5, delay: 0.18 }}
-            className="text-sm text-gray-500 max-w-sm mx-auto leading-relaxed mb-10"
-          >
+          <p className="text-sm text-gray-500 max-w-sm mx-auto leading-relaxed mb-10 animate-slide-up hero-delay-1 anim-fill-both">
             Cortes automáticos, legendas sincronizadas, ilustrações e formato 9:16 — pronto para publicar.
-          </motion.p>
+          </p>
 
-          {/* Upload Zone */}
-          <motion.div
-            initial={{ opacity: 0, y: 28 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.55, delay: 0.28 }}
-            className="w-full max-w-lg mx-auto"
-          >
+          <div className="w-full max-w-lg mx-auto animate-slide-up hero-delay-2 anim-fill-both">
             <UploadZone onSuccess={(jobId) => router.push(`/editor/${jobId}`)} />
-          </motion.div>
+          </div>
         </section>
 
         {/* Footer stats */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="border-t border-border-dim"
-        >
+        <div className="border-t border-border-dim animate-slide-up hero-delay-3 anim-fill-both">
           <div className="max-w-lg mx-auto px-4 py-6 grid grid-cols-3 gap-4 text-center">
             {[
               { value: '6', label: 'Etapas automáticas' },
@@ -98,7 +76,7 @@ export default function AppHome() {
               </div>
             ))}
           </div>
-        </motion.div>
+        </div>
       </div>
     </main>
   );
