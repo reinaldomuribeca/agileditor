@@ -196,7 +196,36 @@ body {
   animation: spin 1.8s linear infinite reverse;
 }
 
-/* === Background orb delay variant === */
+/* === Background orb delay variants === */
+.orb-delay-2 {
+  animation-delay: 2s;
+}
+
 .orb-delay-4 {
   animation-delay: 4s;
+}
+
+/* === Hero entrance animation helpers === */
+.anim-fill-both {
+  animation-fill-mode: both;
+}
+
+.hero-delay-1 {
+  animation-delay: 0.08s;
+  animation-fill-mode: both;
+}
+
+.hero-delay-2 {
+  animation-delay: 0.18s;
+  animation-fill-mode: both;
+}
+
+.hero-delay-3 {
+  animation-delay: 0.28s;
+  animation-fill-mode: both;
+}
+
+.hero-delay-4 {
+  animation-delay: 0.4s;
+  animation-fill-mode: both;
 }
