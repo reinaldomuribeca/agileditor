@@ -134,13 +134,18 @@ export async function POST(request: NextRequest) {
     }
     await fs.writeFile(imagePath, buffer);
 
-    // Update analysis.scenes[sceneIdx].imageUrl in metadata
+    // Update analysis.scenes[sceneIdx].imageUrl in metadata + track image count
     const updatedScenes = scenes.slice();
     updatedScenes[sceneIdx] = { ...scene, imageUrl: relativeUrl };
+    const prevImageCount = job.tokenUsage?.imageGenCount ?? 0;
     await saveJobMetadata(jobId, {
       analysis: {
         ...job.analysis!,
         scenes: updatedScenes,
+      },
+      tokenUsage: {
+        ...(job.tokenUsage ?? {}),
+        imageGenCount: prevImageCount + 1,
       },
     });
 

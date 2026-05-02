@@ -140,10 +140,55 @@ export interface JobMetadata {
   warnings?: string[];
   /** Average luminance of the first frame (0-255). Used for intro title auto-contrast. */
   firstFrameLuminance?: number;
+  /** Which user submitted this job. Undefined on legacy jobs created before user accounts. */
+  userId?: string;
+  /** API usage recorded during this job's pipeline steps. */
+  tokenUsage?: TokenUsage;
 }
 
 export interface PipelineStep {
   id: 'upload' | 'normalize' | 'transcribe' | 'analyze' | 'editing' | 'render';
   label: string;
   status: 'pending' | 'in-progress' | 'complete' | 'error';
+}
+
+// ─── Token / cost tracking ────────────────────────────────────────────────
+
+export interface TokenUsage {
+  /** Audio duration sent to transcription API, in minutes. */
+  whisperAudioMinutes?: number;
+  /** Input tokens consumed by the scene-analysis LLM call. */
+  claudeInputTokens?: number;
+  /** Output tokens produced by the scene-analysis LLM call. */
+  claudeOutputTokens?: number;
+  /** Number of images generated via the image API. */
+  imageGenCount?: number;
+  /** Pre-computed USD cost estimate (sum of all above at standard rates). */
+  estimatedCostUSD?: number;
+}
+
+// ─── Users ────────────────────────────────────────────────────────────────
+
+export type UserPlan = 'free' | 'starter' | 'pro' | 'enterprise';
+export type UserStatus = 'active' | 'suspended' | 'pending';
+
+export interface UserLimits {
+  videosPerMonth: number;
+  maxVideoDurationSecs: number;
+  maxStorageMB: number;
+}
+
+export interface User {
+  id: string;
+  email: string;
+  name: string;
+  plan: UserPlan;
+  status: UserStatus;
+  /** PBKDF2-derived key stored as hex(salt):hex(hash). */
+  passwordHash: string;
+  createdAt: string;
+  updatedAt: string;
+  /** Override default plan limits for this specific user. */
+  limits?: Partial<UserLimits>;
+  notes?: string;
 }

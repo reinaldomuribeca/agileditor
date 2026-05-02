@@ -6,10 +6,10 @@ import UploadZone from '@/components/upload/UploadZone';
 
 const FEATURES = [
   { icon: '🎙', label: 'Transcrição automática' },
-  { icon: '🤖', label: 'Claude AI' },
-  { icon: '🎨', label: 'Análise de cores' },
-  { icon: '✂️', label: 'Detecção de cenas' },
-  { icon: '🎬', label: 'Render Remotion' },
+  { icon: '✂️', label: 'Corte inteligente' },
+  { icon: '🎨', label: 'Análise de cenas' },
+  { icon: '💬', label: 'Legendas sincronizadas' },
+  { icon: '📱', label: 'Exportação vertical' },
 ];
 
 export default function Home() {
@@ -72,8 +72,8 @@ export default function Home() {
             transition={{ duration: 0.5, delay: 0.2 }}
             className="text-[15px] text-gray-500 max-w-md mx-auto leading-relaxed mb-8"
           >
-            Envie qualquer vídeo. Nossa IA detecta cenas, transcreve a fala,
-            analisa cores e renderiza um short vertical polido automaticamente.
+            Envie qualquer vídeo. Cortes automáticos, legendas sincronizadas,
+            ilustrações e exportação em formato vertical — tudo sem editar manualmente.
           </motion.p>
 
           {/* Feature pills */}
@@ -114,7 +114,7 @@ export default function Home() {
         >
           <div className="max-w-lg mx-auto px-4 py-8 grid grid-cols-3 gap-4 text-center">
             {[
-              { value: '6', label: 'Etapas de IA' },
+              { value: '6', label: 'Etapas automáticas' },
               { value: '9:16', label: 'Formato' },
               { value: '30fps', label: 'Output' },
             ].map((s) => (

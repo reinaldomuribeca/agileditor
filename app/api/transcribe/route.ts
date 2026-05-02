@@ -244,10 +244,15 @@ export async function POST(request: NextRequest) {
 
     await fs.writeFile(subtitlesPath, JSON.stringify(finalSubtitles, null, 2));
 
+    const whisperAudioMinutes = (job.duration ?? 0) / 60;
     await saveJobMetadata(jobId, {
       status: 'cutting-silence',
       subtitles: finalSubtitles,
       warnings,
+      tokenUsage: {
+        ...(job.tokenUsage ?? {}),
+        whisperAudioMinutes,
+      },
     });
 
     console.log(`✓ Transcribed ${jobId}: ${finalSubtitles.length} subtitles`);

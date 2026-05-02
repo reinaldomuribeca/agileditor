@@ -10,7 +10,8 @@
  * handlers) and the Edge runtime (middleware).
  */
 
-export const COOKIE_NAME = 'agil_session';
+export const COOKIE_NAME       = 'agil_session';
+export const ADMIN_COOKIE_NAME = 'agil_admin_session';
 export const COOKIE_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
 
 async function hmacHex(payload: string, secret: string): Promise<string> {
@@ -57,4 +58,45 @@ function constantTimeEqual(a: string, b: string): boolean {
     diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
   }
   return diff === 0;
+}
+
+// ─── Admin session (separate cookie, uses ADMIN_PASSWORD env var) ─────────
+
+/** Build a signed admin cookie: same scheme as the regular session. */
+export async function signAdminCookie(secret: string): Promise<string> {
+  return signCookie(secret);
+}
+
+/** Verify an admin cookie. */
+export async function verifyAdminCookie(cookie: string, secret: string): Promise<boolean> {
+  return verifyCookie(cookie, secret);
+}
+
+// ─── User session (carries userId in the payload) ────────────────────────
+
+/**
+ * Build a signed user session cookie:
+ * `${expiryMs}:${userId}.${hex(hmac(expiryMs:userId, secret))}`.
+ * The secret is the user's PBKDF2-hashed password stored in their profile,
+ * so rotating the password automatically invalidates the session.
+ */
+export async function signUserCookie(userId: string, secret: string): Promise<string> {
+  const exp = Date.now() + COOKIE_MAX_AGE_SECONDS * 1000;
+  const payload = `${exp}:${userId}`;
+  const sig = await hmacHex(payload, secret);
+  return `${payload}.${sig}`;
+}
+
+/** Verify a user session cookie and return the userId if valid. */
+export async function verifyUserCookie(cookie: string, secret: string): Promise<string | null> {
+  const dot = cookie.lastIndexOf('.');
+  if (dot < 0) return null;
+  const payload = cookie.slice(0, dot);
+  const sig = cookie.slice(dot + 1);
+  const expected = await hmacHex(payload, secret);
+  if (!constantTimeEqual(sig, expected)) return null;
+  const [expStr, userId] = payload.split(':');
+  const exp = Number.parseInt(expStr, 10);
+  if (!Number.isFinite(exp) || Date.now() >= exp) return null;
+  return userId ?? null;
 }

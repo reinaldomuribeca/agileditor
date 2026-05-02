@@ -10,10 +10,10 @@ import EditorLayout from '@/components/editor/EditorLayout';
 const STEPS = [
   { id: 'uploading',        label: 'Upload',           desc: 'Enviando vídeo para o servidor' },
   { id: 'normalizing',      label: 'Normalizar',       desc: 'Convertendo para H.264 · 30 fps' },
-  { id: 'transcribing',     label: 'Transcrever',      desc: 'Whisper AI extrai fala com timestamps' },
+  { id: 'transcribing',     label: 'Transcrever',      desc: 'Extraindo fala e timestamps do áudio' },
   { id: 'cutting-silence',  label: 'Cortar silêncio',  desc: 'Removendo pausas longas e regravando timeline' },
-  { id: 'analyzing',        label: 'Analisar IA',      desc: 'Claude detecta cenas e paleta de cores' },
-  { id: 'rendering',        label: 'Renderizar',       desc: 'Remotion gera o vídeo final 9:16' },
+  { id: 'analyzing',        label: 'Analisar cenas',   desc: 'Detectando cenas, paleta de cores e ritmo' },
+  { id: 'rendering',        label: 'Renderizar',       desc: 'Gerando o vídeo final 9:16 em alta qualidade' },
 ] as const;
 
 type StepId = (typeof STEPS)[number]['id'];

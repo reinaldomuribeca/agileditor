@@ -43,15 +43,15 @@ function OptionGrid<T extends string>({ options, value, onChange, cols = 2 }: Op
             onClick={() => onChange(opt.id)}
             className={`px-2.5 py-2 rounded-lg text-left border transition-all duration-150 ${
               active
-                ? 'border-gold/50 bg-gold/[0.08]'
-                : 'border-border-dim bg-surface-1 hover:border-border-mid'
+                ? 'border-gold/60 bg-gold/[0.10]'
+                : 'border-border-dim bg-app hover:border-gold/25 hover:bg-gold/[0.03]'
             }`}
           >
-            <p className={`text-xs font-bold leading-tight ${active ? 'text-gold' : 'text-gray-300'}`}>
+            <p className={`text-xs font-bold leading-tight ${active ? 'text-gold' : 'text-gray-400'}`}>
               {opt.label}
             </p>
             {opt.desc && (
-              <p className="text-[10px] text-gray-600 mt-0.5 leading-snug">{opt.desc}</p>
+              <p className="text-[10px] text-gray-500 mt-0.5 leading-snug">{opt.desc}</p>
             )}
           </button>
         );
@@ -68,14 +68,14 @@ interface SectionProps {
 
 function Section({ number, title, children }: SectionProps) {
   return (
-    <section className="space-y-2">
+    <section className="space-y-2 py-4">
       <div className="flex items-center gap-2">
-        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-gold/15 text-gold text-[10px] font-black tabular-nums">
+        <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-gold/20 text-gold text-[10px] font-black tabular-nums">
           {number}
         </span>
-        <h3 className="text-xs font-bold text-gray-300 uppercase tracking-wider">{title}</h3>
+        <h3 className="text-xs font-bold text-gray-200 font-bold uppercase tracking-wider">{title}</h3>
       </div>
-      <div className="pl-7">{children}</div>
+      <div className="pl-7"><div className="bg-app/30 rounded-lg p-3">{children}</div></div>
     </section>
   );
 }
@@ -170,11 +170,11 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
   const update = (patch: Partial<Questionnaire>) => onChange({ ...value, ...patch });
 
   return (
-    <div className="rounded-2xl border border-border-dim bg-surface-1/50 overflow-hidden">
+    <div className="rounded-2xl border border-border-dim bg-app-2/80 overflow-hidden">
       <button
         type="button"
         onClick={() => setCollapsed(!collapsed)}
-        className="w-full flex items-center justify-between px-4 py-3 hover:bg-surface-2/40 transition-colors"
+        className="w-full flex items-center justify-between px-4 py-3 bg-app-2 hover:bg-surface-2/40 transition-colors"
       >
         <div className="flex items-center gap-2.5">
           <svg className="w-4 h-4 text-gold" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -189,7 +189,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
       </button>
 
       {!collapsed && (
-        <div className="p-4 space-y-5 border-t border-border-dim">
+        <div className="p-4 divide-y divide-border-dim border-t border-border-dim">
           {/* 1. Tipo de conteúdo */}
           <Section number={1} title="Tipo de conteúdo">
             <OptionGrid
@@ -204,7 +204,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
                 value={value.contentTypeOther ?? ''}
                 onChange={(e) => update({ contentTypeOther: e.target.value.slice(0, 60) })}
                 placeholder="Descreva o tipo..."
-                className="mt-2 w-full rounded-lg bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
+                className="mt-2 w-full rounded-lg bg-app border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
               />
             )}
           </Section>
@@ -230,7 +230,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
             {value.music.enabled && (
               <div className="mt-3 space-y-3">
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Estilo</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Estilo</p>
                   <OptionGrid
                     options={MUSIC_STYLES}
                     value={value.music.style ?? 'energetic'}
@@ -243,12 +243,12 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
                       value={value.music.styleOther ?? ''}
                       onChange={(e) => update({ music: { ...value.music, styleOther: e.target.value.slice(0, 60) } })}
                       placeholder="Descreva o estilo musical..."
-                      className="mt-2 w-full rounded-lg bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
+                      className="mt-2 w-full rounded-lg bg-app border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
                     />
                   )}
                 </div>
                 <div>
-                  <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-1.5">Volume vs. voz</p>
+                  <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1.5">Volume vs. voz</p>
                   <OptionGrid
                     options={MUSIC_VOLUMES}
                     value={value.music.volume ?? 'medium'}
@@ -282,7 +282,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
             />
             {value.illustrations.enabled && (
               <div className="mt-3 space-y-2">
-                <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider">Estilo visual</p>
+                <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Estilo visual</p>
                 <OptionGrid
                   options={ILLUSTRATION_STYLES}
                   value={value.illustrations.style ?? 'minimal'}
@@ -310,7 +310,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
                   value={value.introTitle.title ?? ''}
                   onChange={(e) => update({ introTitle: { ...value.introTitle, title: e.target.value.slice(0, 80) } })}
                   placeholder="Título principal (ex: COMO MUDEI MINHA VIDA)"
-                  className="w-full rounded-lg bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2 font-bold uppercase"
+                  className="w-full rounded-lg bg-app border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2 font-bold uppercase"
                   maxLength={80}
                 />
                 <input
@@ -318,7 +318,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
                   value={value.introTitle.subtitle ?? ''}
                   onChange={(e) => update({ introTitle: { ...value.introTitle, subtitle: e.target.value.slice(0, 120) } })}
                   placeholder="Subtítulo (opcional)"
-                  className="w-full rounded-lg bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
+                  className="w-full rounded-lg bg-app border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2"
                   maxLength={120}
                 />
               </div>
@@ -343,7 +343,7 @@ export default function QuestionnaireForm({ value, onChange }: QuestionnaireForm
               placeholder='Ex: "remova os silêncios longos", "destaque o trecho 1:30 a 2:00", "mantenha apenas momentos de fala"'
               rows={3}
               maxLength={1500}
-              className="w-full rounded-lg bg-app-2 border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2 resize-none"
+              className="w-full rounded-lg bg-app border border-border-dim focus:border-gold/50 focus:outline-none text-white placeholder-gray-700 text-sm px-3 py-2 resize-none"
             />
             <span className={`block text-right text-[10px] tabular-nums mt-1 ${(value.notes?.length ?? 0) >= 1350 ? 'text-amber-400' : 'text-gray-700'}`}>
               {value.notes?.length ?? 0}/1500

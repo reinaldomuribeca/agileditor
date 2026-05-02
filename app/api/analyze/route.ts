@@ -278,12 +278,19 @@ REGRA CRÍTICA DE startLeg (NÃO QUEBRE):
       }
     }
 
+    const claudeInputTokens  = message.usage?.input_tokens  ?? 0;
+    const claudeOutputTokens = message.usage?.output_tokens ?? 0;
     await saveJobMetadata(jobId, {
       status: 'editing',
       analysis,
+      tokenUsage: {
+        ...(job.tokenUsage ?? {}),
+        claudeInputTokens,
+        claudeOutputTokens,
+      },
     });
 
-    console.log(`✓ Analyzed ${jobId}: ${analysis.scenes.length} scenes`);
+    console.log(`✓ Analyzed ${jobId}: ${analysis.scenes.length} scenes (tokens: ${claudeInputTokens}↑ ${claudeOutputTokens}↓)`);
 
     return NextResponse.json({ success: true, analysis });
 
