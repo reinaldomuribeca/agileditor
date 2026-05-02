@@ -59,6 +59,9 @@ RUN npm ci
 COPY . .
 
 ENV NEXT_TELEMETRY_DISABLED=1
+# cache-bust: v2-landing-page
+ARG CACHEBUST=1
+RUN echo "build $CACHEBUST"
 
 RUN npm run build
 
