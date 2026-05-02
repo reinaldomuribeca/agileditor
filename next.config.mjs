@@ -15,6 +15,13 @@ const nextConfig = {
   },
   headers: async () => [
     {
+      source: '/',
+      headers: [
+        { key: 'Cache-Control', value: 'no-store, must-revalidate' },
+        { key: 'X-Accel-Buffering', value: 'no' },
+      ],
+    },
+    {
       source: '/api/video/:path*',
       headers: [
         {

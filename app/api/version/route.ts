@@ -4,5 +4,5 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
-  return NextResponse.json({ version: 'landing-page-v2' });
+  return NextResponse.json({ version: 'landing-page-v3' });
 }

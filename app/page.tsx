@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { headers } from 'next/headers';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -145,7 +146,8 @@ const FAQ = [
   },
 ];
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  headers(); // forces dynamic rendering — bypasses full-route cache
   return (
     <main className="min-h-screen bg-app overflow-x-hidden" data-page="sales-landing-v2">
 
