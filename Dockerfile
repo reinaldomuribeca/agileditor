@@ -165,4 +165,4 @@ USER nextjs
 
 EXPOSE 3333
 
-CMD ["sh", "-c", "rm -rf /app/.next/cache/fetch-cache && npm run start"]
+CMD ["sh", "-c", "rm -f /app/.next/server/app/page.html /app/.next/server/app/page.rsc && rm -rf /app/.next/cache && npm run start"]
