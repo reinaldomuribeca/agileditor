@@ -1,8 +1,6 @@
 'use client';
 
-export const dynamic = 'force-dynamic';
-
-import { useState } from 'react';
+import { Suspense, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 
@@ -18,7 +16,7 @@ const PLAN_FEATURES: Record<string, string[]> = {
   enterprise: ['Volume ilimitado', 'Integração por API', 'SLA e suporte dedicado'],
 };
 
-export default function RegisterPage() {
+function RegisterForm() {
   const searchParams = useSearchParams();
   const planParam = searchParams.get('plan') ?? 'starter';
 
@@ -162,7 +160,7 @@ export default function RegisterPage() {
                 <p className="text-xs font-bold text-gold uppercase tracking-wider">Plano selecionado</p>
                 <p className="text-lg font-black text-white mt-1">{PLAN_LABELS[form.plan] ?? PLAN_LABELS.starter}</p>
               </div>
-              <Link href="#precos" className="text-xs text-gray-500 hover:text-gold transition-colors">
+              <Link href="/#precos" className="text-xs text-gray-500 hover:text-gold transition-colors">
                 Mudar plano
               </Link>
             </div>
@@ -285,5 +283,13 @@ export default function RegisterPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense>
+      <RegisterForm />
+    </Suspense>
   );
 }
